@@ -1,32 +1,26 @@
 #!/bin/bash
 set -e
 
-XANMOD_VERSION="6.12.30-xanmod1"
 KERNEL_SUFFIX="-xeno1"
 
 echo "=== Xeno OS Kernel Build ==="
-echo "Base: XanMod ${XANMOD_VERSION}"
+echo "Base: XanMod (Latest Default Branch)"
 echo "Patches: Kali mac80211 wireless injection"
 
 mkdir -p /tmp/kernel-build
 cd /tmp/kernel-build
 
 echo "--- Downloading XanMod source ---"
-wget -q "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.30.tar.xz"
-tar -xf linux-6.12.30.tar.xz
-cd linux-6.12.30
-
-echo "--- Downloading XanMod patches ---"
-wget -q "https://github.com/xanmod/linux/releases/download/${XANMOD_VERSION}/patch-${XANMOD_VERSION}.xz"
-xz -d patch-${XANMOD_VERSION}.xz
-patch -p1 < patch-${XANMOD_VERSION}
+# Pulling directly from XanMod's new GitLab repository!
+git clone --depth=1 https://gitlab.com/xanmod/linux.git linux-xanmod
+cd linux-xanmod
 
 echo "--- Applying Kali wireless injection patches ---"
 PATCH_DIR="${GITHUB_WORKSPACE}/kernel/patches"
 for patch_file in "${PATCH_DIR}"/*.patch; do
     if [ -f "$patch_file" ]; then
         echo "Applying: $(basename $patch_file)"
-        patch -p1 --forward < "$patch_file" || echo "Patch may already be applied, continuing"
+        patch -p1 --forward < "$patch_file" || echo "Patch may already be applied or conflict, continuing"
     fi
 done
 
