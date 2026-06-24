@@ -23,8 +23,8 @@ jobs:
           sudo apt update
           sudo apt install -y \
             build-essential gcc g++ make \
-            libssl-dev libelf-dev libncurses-dev \
-            flex bison bc cpio \
+            libssl-dev libelf-dev libncurses-dev libdw-dev \
+            flex bison bc cpio rsync kmod \
             dwarves pahole \
             xz-utils zstd wget \
             debhelper dpkg-dev
