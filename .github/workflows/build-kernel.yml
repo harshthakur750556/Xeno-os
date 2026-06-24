@@ -1,0 +1,55 @@
+name: Build Xeno OS Kernel
+
+on:
+  push:
+    paths:
+      - 'kernel/patches/**'
+      - 'kernel/build-kernel.sh'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 1 * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential gcc g++ make \
+            libssl-dev libelf-dev libncurses-dev \
+            flex bison bc cpio \
+            dwarves pahole \
+            xz-utils zstd wget \
+            debhelper dpkg-dev
+
+      - name: Build Xeno OS kernel
+        run: |
+          chmod +x kernel/build-kernel.sh
+          bash kernel/build-kernel.sh
+
+      - name: Upload kernel packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeno-kernel-debs
+          path: kernel/output/*.deb
+          retention-days: 90
+
+      - name: Create Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: kernel-${{ github.run_number }}
+          name: "Xeno OS Kernel Build ${{ github.run_number }}"
+          files: kernel/output/*.deb
+          body: |
+            Xeno OS custom kernel with XanMod optimizations and Kali wireless injection patches.
+            Install with: sudo dpkg -i linux-image-*.deb linux-headers-*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
