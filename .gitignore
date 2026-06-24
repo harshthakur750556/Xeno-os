@@ -1,0 +1,14 @@
+rootfs/
+iso/output/
+kernel/source/
+kernel/output/
+*.iso
+*.squashfs
+*.deb
+*.tar.gz
+*.tar.xz
+__pycache__/
+*.pyc
+.cache/
+node_modules/
+xeno-gui-env/
