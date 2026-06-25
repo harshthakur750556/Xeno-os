@@ -51,6 +51,15 @@ make x86_64_defconfig
 ./scripts/config --enable CONFIG_SND_HDA_INTEL
 ./scripts/config --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT
 ./scripts/config --disable CONFIG_DEBUG_INFO
+# Enable Live-Boot Required Filesystems and Loop Devices
+./scripts/config --enable CONFIG_OVERLAY_FS
+./scripts/config --enable CONFIG_SQUASHFS
+./scripts/config --enable CONFIG_SQUASHFS_ZSTD
+./scripts/config --enable CONFIG_SQUASHFS_XZ
+./scripts/config --enable CONFIG_ISO9660_FS
+./scripts/config --enable CONFIG_TMPFS
+./scripts/config --enable CONFIG_TMPFS_POSIX_ACL
+./scripts/config --enable CONFIG_BLK_DEV_LOOP
 make olddefconfig
 
 echo "--- Compiling kernel ---"
