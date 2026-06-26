@@ -56,10 +56,17 @@ make x86_64_defconfig
 ./scripts/config --enable CONFIG_SQUASHFS
 ./scripts/config --enable CONFIG_SQUASHFS_ZSTD
 ./scripts/config --enable CONFIG_SQUASHFS_XZ
+./scripts/config --enable CONFIG_SQUASHFS_LZ4
 ./scripts/config --enable CONFIG_ISO9660_FS
+./scripts/config --enable CONFIG_JOLIET
 ./scripts/config --enable CONFIG_TMPFS
 ./scripts/config --enable CONFIG_TMPFS_POSIX_ACL
 ./scripts/config --enable CONFIG_BLK_DEV_LOOP
+./scripts/config --enable CONFIG_DEVTMPFS
+./scripts/config --enable CONFIG_DEVTMPFS_MOUNT
+./scripts/config --enable CONFIG_VFAT_FS
+./scripts/config --enable CONFIG_NLS_CODEPAGE_437
+./scripts/config --enable CONFIG_NLS_UTF8
 make olddefconfig
 
 echo "--- Compiling kernel ---"
