@@ -3,7 +3,7 @@ set -e
 
 KERNEL_SUFFIX="-xeno1"
 
-echo "=== Xeno OS Kernel Build ==="
+echo "=== Xeno OS Universal Production Kernel Build ==="
 echo "Base: XanMod (Latest Default Branch)"
 echo "Patches: Kali mac80211 wireless injection"
 
@@ -11,7 +11,6 @@ mkdir -p /tmp/kernel-build
 cd /tmp/kernel-build
 
 echo "--- Downloading XanMod source ---"
-# Pulling directly from XanMod's new GitLab repository!
 git clone --depth=1 https://gitlab.com/xanmod/linux.git linux-xanmod
 cd linux-xanmod
 
@@ -24,52 +23,28 @@ for patch_file in "${PATCH_DIR}"/*.patch; do
     fi
 done
 
-echo "--- Configuring kernel ---"
-make x86_64_defconfig
+echo "--- Configuring kernel using Ubuntu Production Baseline ---"
+# Copy the GitHub runner's official production Ubuntu config as our baseline!
+cp /boot/config-$(uname -r) .config
+
+# Update it to match the XanMod source structure
+make olddefconfig
+
+# Inject our custom performance and wireless overrides
 ./scripts/config --enable CONFIG_PREEMPT
 ./scripts/config --enable CONFIG_HZ_1000
 ./scripts/config --set-val CONFIG_HZ 1000
-./scripts/config --enable CONFIG_EXPERT
-./scripts/config --enable CONFIG_FUTEX
-./scripts/config --enable CONFIG_FUTEX_PI
 ./scripts/config --enable CONFIG_NTSYNC
-./scripts/config --enable CONFIG_CFQ_GROUP_IOSCHED
-./scripts/config --enable CONFIG_BFQ_GROUP_IOSCHED
-./scripts/config --enable CONFIG_NET
-./scripts/config --enable CONFIG_WIRELESS
-./scripts/config --enable CONFIG_CFG80211
-./scripts/config --enable CONFIG_MAC80211
 ./scripts/config --enable CONFIG_MAC80211_MONITOR_BY_DEFAULT
-./scripts/config --enable CONFIG_RFKILL
-./scripts/config --enable CONFIG_INTEL_IDLE
-./scripts/config --enable CONFIG_ACPI_PROCESSOR
-./scripts/config --enable CONFIG_X86_INTEL_LPSS
-./scripts/config --enable CONFIG_I915
-./scripts/config --enable CONFIG_DRM_I915
-./scripts/config --enable CONFIG_SOUND
-./scripts/config --enable CONFIG_SND
-./scripts/config --enable CONFIG_SND_HDA_INTEL
+./scripts/config --enable CONFIG_MAC80211
+./scripts/config --enable CONFIG_CFG80211
+
+# Disable heavy debug symbols to speed up compile time by 30%
 ./scripts/config --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT
 ./scripts/config --disable CONFIG_DEBUG_INFO
-# Enable Live-Boot Required Filesystems and Loop Devices
-./scripts/config --enable CONFIG_OVERLAY_FS
-./scripts/config --enable CONFIG_SQUASHFS
-./scripts/config --enable CONFIG_SQUASHFS_ZSTD
-./scripts/config --enable CONFIG_SQUASHFS_XZ
-./scripts/config --enable CONFIG_SQUASHFS_LZ4
-./scripts/config --enable CONFIG_ISO9660_FS
-./scripts/config --enable CONFIG_JOLIET
-./scripts/config --enable CONFIG_TMPFS
-./scripts/config --enable CONFIG_TMPFS_POSIX_ACL
-./scripts/config --enable CONFIG_BLK_DEV_LOOP
-./scripts/config --enable CONFIG_DEVTMPFS
-./scripts/config --enable CONFIG_DEVTMPFS_MOUNT
-./scripts/config --enable CONFIG_VFAT_FS
-./scripts/config --enable CONFIG_NLS_CODEPAGE_437
-./scripts/config --enable CONFIG_NLS_UTF8
 make olddefconfig
 
-echo "--- Compiling kernel ---"
+echo "--- Compiling kernel (This will take a while) ---"
 make -j$(nproc) bindeb-pkg \
     LOCALVERSION="${KERNEL_SUFFIX}" \
     KDEB_PKGVERSION="1.0" \
