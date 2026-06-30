@@ -5,14 +5,22 @@ on:
     paths:
       - 'kernel/patches/**'
       - 'kernel/build-kernel.sh'
+      - '.github/workflows/build-kernel.yml'
   workflow_dispatch:
   schedule:
     - cron: '0 2 1 * *'
 
+# Grant permission to create Releases and upload assets
+permissions:
+  contents: write
+
 jobs:
-  build:
+  compile_kernel:
+    name: Compile Kernel Packages
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    outputs:
+      run_number: ${{ github.run_number }}
 
     steps:
       - name: Free Disk Space (Maximize Storage)
@@ -56,20 +64,34 @@ jobs:
           chmod +x kernel/build-kernel.sh
           bash kernel/build-kernel.sh
 
-      - name: Upload kernel packages
+      - name: Upload kernel packages to artifact store
         uses: actions/upload-artifact@v4
         with:
           name: xeno-kernel-debs
           path: kernel/output/*.deb
-          retention-days: 90
+          retention-days: 1
 
-      - name: Create Release
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+  publish_release:
+    name: Publish GitHub Release
+    needs: compile_kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Only run release generation on actual push or manual dispatch
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Download kernel packages from compilation job
+        uses: actions/download-artifact@v4
+        with:
+          name: xeno-kernel-debs
+          path: ./kernel-debs
+
+      - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: kernel-${{ github.run_number }}
-          name: "Xeno OS Kernel Build ${{ github.run_number }}"
-          files: kernel/output/*.deb
+          tag_name: kernel-${{ needs.compile_kernel.outputs.run_number }}
+          name: "Xeno OS Kernel Build ${{ needs.compile_kernel.outputs.run_number }}"
+          files: ./kernel-debs/*.deb
           body: |
             Xeno OS custom kernel with XanMod optimizations and Kali wireless injection patches.
             Install with: sudo dpkg -i linux-image-*.deb linux-headers-*.deb
