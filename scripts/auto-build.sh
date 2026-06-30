@@ -2,7 +2,7 @@
 set -e
 
 REPO="YOURGITHUBUSERNAME/xeno-os" # The script will automatically detect this from git, but falls back here
-WS_DIR="$HOME/xeno-os"
+WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
 TARGET_ISO="/mnt/c/Users/harsh/xeno_os-alpha-v_02.0.iso"
 
 cd "$WS_DIR"
