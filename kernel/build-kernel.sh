@@ -26,7 +26,8 @@ done
 echo "--- Configuring kernel using Ubuntu Production Baseline ---"
 # Copy the GitHub runner's official production Ubuntu config as our baseline!
 cp /boot/config-$(uname -r) .config
-
+./scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
+./scripts/config --set-str CONFIG_SYSTEM_REVOCATION_KEYS ""
 # Update it to match the XanMod source structure
 make olddefconfig
 
