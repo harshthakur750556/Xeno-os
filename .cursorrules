@@ -1,0 +1,126 @@
+
+```markdown
+# XENO OS GLOBAL SYSTEM INSTRUCTIONS & DEVELOPMENT CONTEXT
+> File Location: ~/Xeno-os/.cursorrules
+> Purpose: This file acts as the absolute source of truth for the Xeno OS development environment. It is automatically loaded by Cursor, CLI agents, and development models to maintain context synchronization and track chronological project changes.
+
+---
+
+## 1. MANDATORY LLM OPERATIONAL RULES
+
+Every model processing this workspace must strictly adhere to the following execution constraints:
+1.  **Tone & Style:** Maintain a highly technical, objective, and humble tone. Avoid superlatives like "perfectly," "flawlessly," "100% correct," or "ultimate." Do not oversell or overclaim success.
+2.  **Politeness Constraints:** Do not use over-the-top politeness, greetings, flattery, or excessive compliments. Address system-engineering prompts directly and mathematically.
+3.  **Phase Containment:** Do not write or suggest Phase 2 (GUI/XenoSense) code unless the user explicitly commands you to do so. Keep all execution logic focused on verifying and preserving the Phase 1 base system.
+4.  **Autonomous Revision Logging:** Whenever you modify any file in this workspace, write a script, or complete a build, you must use your file-writing privileges to immediately open this file (`~/Xeno-os/.cursorrules`), locate the `## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG` section, and append a detailed, chronological briefing of your work using the template provided.
+
+---
+
+## 2. SYSTEM ARCHITECTURE & PLATFORM SPECIFICATIONS
+
+*   **Development Host:** Windows 11 with WSL2 (Ubuntu 24.04 LTS "Noble Numbat").
+*   **Target Hardware Target:** Lenovo ThinkPad T480 (Intel Core i5-8250U, 8GB RAM).
+*   **Target Virtualization Platforms:** Microsoft Hyper-V (Gen 2 UEFI), VirtualBox (VMSVGA + 3D), and VMware.
+*   **Operating System Base:** Minimal Ubuntu 24.04 LTS built via `debootstrap --variant=minbase`.
+*   **Graphics and Display Stack:** Wayland display architecture using the Hyprland C++ compositor, running on software fallback rendering (`llvmpipe`) inside virtual machines and native hardware graphics on bare metal.
+*   **Windows Software Compatibility:** Flatpak-isolated Bottles runner executing Wine with DXVK and VKD3D translation libraries.
+
+---
+
+## 3. FILE SYSTEM & PROJECT LAYOUT
+
+```
+~/Xeno-os/
+├── .github/
+│   └── workflows/
+│       └── build-kernel.yml       # Modular, multi-job Actions pipeline
+├── rootfs/                        # Minimal Ubuntu 24.04 chroot jail
+│   ├── usr/bin/
+│   │   └── xeno-start-hyprland    # Automatic graphics driver fallback script
+│   ├── etc/systemd/system/
+│   │   └── xeno-session.service   # Systemd graphical session launcher
+│   └── [standard filesystem mount trees]
+├── kernel/
+│   ├── build-kernel.sh            # XanMod + Kali patch compiler script
+│   ├── patches/                   # mac80211 wireless injection patches
+│   └── output/                    # Staging directory for compiled .deb packages
+├── iso/
+│   ├── build/                     # Temporary staging workspace for xorriso
+│   │   ├── casper/                # Live kernel (vmlinuz), ramdisk (initrd), & filesystem.squashfs
+│   │   └── boot/grub/             # GRUB configurations & El Torito boot images
+│   └── output/                    # Final target storage for compiled ISOs
+├── desktop/                       # Workspace directory for all Phase 2 files
+│   ├── shell/                     # TypeScript Astal bar and launcher code
+│   └── panels/                    # Thread-safe PySide6 scientific widgets
+├── scripts/
+│   ├── enter-rootfs.sh            # Chroot bind-mount helper script
+│   └── auto-build.sh              # Unified, local gh-cli API packaging script
+└── .cursorrules                   # Global system instructions and active logs (this file)
+```
+
+---
+
+## 4. CRITICAL ENGINEERING RESOLUTIONS
+
+1.  **The Universal Driver Resolution:** To boot on hypervisors, the kernel configuration does not use `defconfig`. It uses the **Ubuntu Production Baseline** configuration cloned from the runner VM `/boot/config-$(uname -r)`. This builds all virtual drivers (`vboxguest`, `vboxvideo`, `hv_vmbus`, `hv_storvsc`, `hyperv_drm`) as active modules (`=m`). They use 0% active RAM unless the specific hypervisor hardware is physically detected.
+2.  **The Cryptographic Signature Bypass:** Standard baseline configs halt compiler runs by checking for Canonical’s private security keys (`CONFIG_SYSTEM_TRUSTED_KEYS`). The compile script overrides these parameters to blank strings `""` inside `build-kernel.sh` to allow signature-free, warning-free compilations.
+3.  **The Casper live-boot Purge:** Debian `live-boot` utilities collide with Ubuntu’s native `casper` stack, causing the initrd to loop and fail to mount SquashFS. The chroot environment explicitly purges all `live-boot` remnants and forces Casper deployment.
+4.  **Virtualization Fallback Script:** Hyper-V and some VirtualBox instances utilize virtualized frameless display adapters (`hyperv_drm`, `llvmpipe`) lacking direct Vulkan/OpenGL acceleration. If Hyprland tries to initialize on raw hardware calls, it will crash and leave a blank screen. The startup process runs via `/usr/bin/xeno-start-hyprland`, which dynamically detects virtualization and exports software-rendering overrides:
+    *   `export WLR_RENDERER_ALLOW_SOFTWARE=1`
+    *   `export WLR_NO_HARDWARE_CURSORS=1`
+    *   `export LIBGL_ALWAYS_SOFTWARE=true`
+    *   `export GALLIUM_DRIVER=llvmpipe`
+5.  **ISO File-Size Level 3 Bypass:** Because the final operating system contains GIMP, GFortran, Octave, and scientific dependencies, the SquashFS image exceeds $4\text{ GB}$. Standard ISO9660 restricts single-file reads beyond this boundary. All ISO builds are executed via a custom `xorriso-wrapper.sh` injecting `-iso-level 3` to support massive compressed file tables under UEFI.
+6.  **WSL2 Local Path Case-Sensitivity:** The build script uses dynamic workspace path detection (`WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`) to eliminate hardcoded folder naming case collisions (such as `xeno-os` vs `Xeno-os`).
+
+---
+
+## 5. STANDARDIZED CORE DEPENDENCIES
+
+The target `rootfs` is configured with these specific system packages:
+*   **System Core:** `systemd`, `systemd-sysv`, `casper`, `udev`, `NetworkManager`.
+*   **Rendering & WM:** `hyprland`, `xwayland`, `kitty`, `wofi`, `dunst`, `grim`, `slurp`, `swww`, `brightnessctl`.
+*   **Scientific and Utilities:** `python3`, `python3-pip`, `octave`, `maxima`, `blender`, `gimp`, `krita`, `kdenlive`, `obs-studio`, `audacity`, `vlc`, `mpv`, `ffmpeg`, `htop`, `btop`, `fastfetch`, `tmux`, `alsa-utils`, `micro`, `fzf`.
+
+---
+
+## 6. LOGGING DIRECTIVE FOR AI DEVELOPMENT SESSIONS
+
+Whenever you modify, add, or test any files, configurations, or packaging parameters, you must follow this sequence:
+1.  Open `~/Xeno-os/.cursorrules`.
+2.  Scroll to the bottom under **`## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG`**.
+3.  Add a horizontal rule (`---`) followed by your detailed briefing using the template below. **Do not modify previous log entries.**
+
+### **Work Briefing Template:**
+```
+### **[DATE / TIME] - Session Briefing**
+*   **Primary Objective:** [Briefly state the goal of your edit]
+*   **Changes Made:**
+    *   `[File Path 1]`: [Detailed changes, logic modifications, packages added]
+    *   `[File Path 2]`: [Detailed changes]
+*   **Compilation Outcome:** [State if compilation passed, warnings received, or if repackaged into a fresh ISO]
+*   **Tested In:** [VirtualBox / Hyper-V / Bare-metal ThinkPad T480]
+*   **Diagnostic Findings:** [State the outcome of the boot check (e.g., uname -r, systemd state, modules loaded)]
+*   **Next Steps Staged:** [Specific recommendations for the next development iteration]
+```
+
+---
+
+## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG
+
+### **July 2, 2026 - Session 1 Briefing**
+*   **Primary Objective:** Consolidate Phase 1, fix the Canonical Signature (Error 2) compile bug, address the Hyper-V blank-screen error, and establish an automated development checkpoint ruleset.
+*   **Changes Made:**
+    *   `.github/workflows/build-kernel.yml`: Refactored into a dependent, multi-job workflow (`compile_kernel` -> `publish_release`) to prevent 3-hour compile runs during release failures. Extended execution limits to 360-minutes and integrated pre-checkout storage-cleaning commands to prevent disk exhaustion. Integrated `libdw-dev`, `rsync`, and `kmod` dependencies.
+    *   `scripts/auto-build.sh`: Fully automated development script using the authenticated `gh` CLI API download triggers. Replaced the hardcoded path with dynamic workspace parent-directory resolution (`WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`) to eliminate case-sensitivity folder collisions (`Xeno-os` vs `xeno-os`).
+    *   `rootfs/usr/bin/xeno-start-hyprland`: Created dynamic virtualization-detection graphics wrapper. Automatically exports software-rendering environment variables (`WLR_RENDERER_ALLOW_SOFTWARE=1`, `GALLIUM_DRIVER=llvmpipe`, etc.) when executing inside Hyper-V, VirtualBox, or VMware.
+    *   `rootfs/etc/systemd/system/xeno-session.service`: Reconfigured default launcher path to execute through the newly integrated `xeno-start-hyprland` graphics fallback wrapper.
+    *   `iso/build/boot/grub/grub.cfg`: Injected `hostname=xeno-os` into the GRUB bootloader parameters to prevent Casper live-boot from resetting the live hostname to `ubuntu` at runtime.
+    *   `rootfs` Packages: Added permanent built-in utilities (`tmux`, `alsa-utils`, `micro`, `fzf`) inside the SquashFS chroot layer.
+*   **Compilation Outcome:** Workflow compiled, packages generated without warnings, and ISO packaged into `xeno_os-alpha-v_02.0.iso`.
+*   **Tested In:** Microsoft Hyper-V (Gen 2 UEFI) and VirtualBox (VMSVGA + 3D).
+*   **Diagnostic Findings:** VM successfully boots directly into the live compositor shell on TTY1 without going blank. System correctly registers the live hostname `xeno-os` and loads Hyper-V core communication modules natively.
+*   **Next Steps Staged:** Awaiting user verification and direct instruction to initiate Phase 2 (GUI Development and XenoSense integration).
+```
+
+---
