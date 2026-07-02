@@ -1,9 +1,4 @@
 
-```markdown
-# XENO OS GLOBAL SYSTEM INSTRUCTIONS & DEVELOPMENT CONTEXT
-> File Location: ~/Xeno-os/.cursorrules
-> Purpose: This file acts as the absolute source of truth for the Xeno OS development environment. It is automatically loaded by Cursor, CLI agents, and development models to maintain context synchronization and track chronological project changes.
-
 ---
 
 ## 1. MANDATORY LLM OPERATIONAL RULES
@@ -12,7 +7,7 @@ Every model processing this workspace must strictly adhere to the following exec
 1.  **Tone & Style:** Maintain a highly technical, objective, and humble tone. Avoid superlatives like "perfectly," "flawlessly," "100% correct," or "ultimate." Do not oversell or overclaim success.
 2.  **Politeness Constraints:** Do not use over-the-top politeness, greetings, flattery, or excessive compliments. Address system-engineering prompts directly and mathematically.
 3.  **Phase Containment:** Do not write or suggest Phase 2 (GUI/XenoSense) code unless the user explicitly commands you to do so. Keep all execution logic focused on verifying and preserving the Phase 1 base system.
-4.  **Autonomous Revision Logging:** Whenever you modify any file in this workspace, write a script, or complete a build, you must use your file-writing privileges to immediately open this file (`~/Xeno-os/.cursorrules`), locate the `## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG` section, and append a detailed, chronological briefing of your work using the template provided.
+4.  **Autonomous Revision Logging:** Whenever you modify any file in this workspace, write a script, or complete a build, you must use your file-writing privileges to immediately open this file (`~/Xeno-os/.cursorrules`), locate the `## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG` section, and append a detailed, chronological briefing of your work using the template provided.
 
 ---
 
@@ -75,7 +70,68 @@ Every model processing this workspace must strictly adhere to the following exec
 
 ---
 
-## 5. STANDARDIZED CORE DEPENDENCIES
+## 5. CODE-LEVEL AI GUARDRAILS (CRITICAL COMPILE RULES)
+
+### GUARDRAIL A: Multi-Threading Memory Bounds (PySide6 / Qt6)
+All visual redrawing, widget configuration, and OpenGL buffer bindings **MUST** execute strictly on the Main GUI Thread. Background calculations (SymPy equations, SciPy signal analysis, Pandas parsing) must occur inside an isolated `QThread` using a worker pattern.
+
+*   **Forbidden Pattern (Do Not Generate):**
+    ```python
+    # ❌ FORBIDDEN: Writing direct UI modifications inside a background thread loop
+    def run_calculation(panel):
+        panel.status_label.setText("Calculating...")  # ❌ Crash
+        result = scipy_heavy_calculation()
+        panel.matplotlib_canvas.draw()                # ❌ Crash (SIGSEGV)
+    ```
+*   **Enforced Pattern (Must Generate):**
+    ```python
+    #   ENFORCED: Segment execution via Qt Signals and Slots (QueuedConnection)
+    class CalculationWorker(QObject):
+        result_ready = Signal(dict)
+        def compute(self):
+            res = scipy_heavy_calculation()
+            self.result_ready.emit({"data": res})
+
+    class MathPanel(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.worker = CalculationWorker()
+            # Always connect using QueuedConnection to jump thread boundaries safely
+            self.worker.result_ready.connect(self.on_result, Qt.QueuedConnection)
+            
+        @Slot(dict)
+        def on_result(self, payload):
+            # This method runs strictly on the main GUI thread
+            self.status_label.setText("Done")
+            self.matplotlib_canvas.draw()
+    ```
+
+### GUARDRAIL B: Astal (v2) vs. Legacy AGS (v1) Syntax Boundaries
+Do not import legacy AGS components or configuration endpoints. Under TypeScript and Bun, you must strictly construct modules using modern Astal v2 namespaces and GObject wrappers.
+
+*   **Forbidden Imports (Do Not Generate):**
+    ```javascript
+    // ❌ FORBIDDEN: Legacy AGS v1 resource scopes
+    import Widget from 'resource:///org/aylur/ags/widget.js';
+    import App from 'resource:///org/aylur/ags/app.js';
+    ```
+*   **Enforced Imports (Must Generate):**
+    ```typescript
+    //   ENFORCED: Modern Astal v2 syntax
+    import { App, Astal, Gtk, Gdk } from "astal/gtk3";
+    import { Variable } from "astal";
+    ```
+
+### GUARDRAIL C: CPU Software Rasterization Optimization (Mesa LLVMpipe)
+Because the OS running inside Hyper-V uses software-based CPU rasterization, you must optimize layouts to minimize CPU cycle spikes:
+1.  **Solid Backgrounds:** Use solid backgrounds (`rgba(13, 13, 26, 0.95)` with very high opacity) rather than dynamic semi-transparent blur frames.
+2.  **No Backdrop CSS Blurs:** Never generate `backdrop-filter: blur(...)` or dynamic graphical shadow computations in your Astal layouts.
+3.  **Static Geometries:** Define explicit widget dimensions. Avoid dynamic self-adjusting padding parameters that force the software renderer to compute window geometries on every frame.
+4.  **Low Refresh Frequencies:** Set clock, battery, and network polling variables to low refresh rates (e.g., $1\text{ Hz}$ or $5\text{ Hz}$) instead of high-frequency render loops.
+
+---
+
+## 6. STANDARDIZED CORE DEPENDENCIES
 
 The target `rootfs` is configured with these specific system packages:
 *   **System Core:** `systemd`, `systemd-sysv`, `casper`, `udev`, `NetworkManager`.
@@ -84,11 +140,11 @@ The target `rootfs` is configured with these specific system packages:
 
 ---
 
-## 6. LOGGING DIRECTIVE FOR AI DEVELOPMENT SESSIONS
+## 7. LOGGING DIRECTIVE FOR AI DEVELOPMENT SESSIONS
 
 Whenever you modify, add, or test any files, configurations, or packaging parameters, you must follow this sequence:
 1.  Open `~/Xeno-os/.cursorrules`.
-2.  Scroll to the bottom under **`## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG`**.
+2.  Scroll to the bottom under **`## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG`**.
 3.  Add a horizontal rule (`---`) followed by your detailed briefing using the template below. **Do not modify previous log entries.**
 
 ### **Work Briefing Template:**
@@ -106,7 +162,7 @@ Whenever you modify, add, or test any files, configurations, or packaging parame
 
 ---
 
-## 7. SYSTEM REVISION HISTORY & DEVELOPMENT LOG
+## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG
 
 ### **July 2, 2026 - Session 1 Briefing**
 *   **Primary Objective:** Consolidate Phase 1, fix the Canonical Signature (Error 2) compile bug, address the Hyper-V blank-screen error, and establish an automated development checkpoint ruleset.
@@ -121,6 +177,6 @@ Whenever you modify, add, or test any files, configurations, or packaging parame
 *   **Tested In:** Microsoft Hyper-V (Gen 2 UEFI) and VirtualBox (VMSVGA + 3D).
 *   **Diagnostic Findings:** VM successfully boots directly into the live compositor shell on TTY1 without going blank. System correctly registers the live hostname `xeno-os` and loads Hyper-V core communication modules natively.
 *   **Next Steps Staged:** Awaiting user verification and direct instruction to initiate Phase 2 (GUI Development and XenoSense integration).
-```
+
 
 ---
