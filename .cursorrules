@@ -1,182 +1,702 @@
-
 ---
 
 ## 1. MANDATORY LLM OPERATIONAL RULES
 
 Every model processing this workspace must strictly adhere to the following execution constraints:
-1.  **Tone & Style:** Maintain a highly technical, objective, and humble tone. Avoid superlatives like "perfectly," "flawlessly," "100% correct," or "ultimate." Do not oversell or overclaim success.
-2.  **Politeness Constraints:** Do not use over-the-top politeness, greetings, flattery, or excessive compliments. Address system-engineering prompts directly and mathematically.
-3.  **Phase Containment:** Do not write or suggest Phase 2 (GUI/XenoSense) code unless the user explicitly commands you to do so. Keep all execution logic focused on verifying and preserving the Phase 1 base system.
-4.  **Autonomous Revision Logging:** Whenever you modify any file in this workspace, write a script, or complete a build, you must use your file-writing privileges to immediately open this file (`~/Xeno-os/.cursorrules`), locate the `## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG` section, and append a detailed, chronological briefing of your work using the template provided.
+
+1. **Tone and Style:** Maintain a highly technical, objective tone. Avoid superlatives like perfectly, flawlessly, 100% correct, or ultimate. Do not oversell success.
+2. **Politeness Constraints:** Do not use over-the-top greetings or flattery. Address engineering prompts directly and mathematically.
+3. **Phase Containment:** Do not write or suggest Phase 2 GUI or XenoSense code unless the user explicitly commands it. Keep all execution logic focused on verifying and preserving the Phase 1 base system.
+4. **Autonomous Revision Logging:** Whenever you modify any file, write a script, or complete a build, immediately open this file, locate Section 8, and append a detailed chronological briefing using the template provided.
+5. **File Read Requirement:** Before generating any code for this project, you must read this entire file. Confirm you have read it by stating which section you found most relevant to the current task before writing a single line of code.
+6. **Never Guess Paths:** Always use the dynamic workspace detection pattern `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"` in scripts. Never hardcode `/home/xeno/Xeno-os` or `/home/xeno/xeno-os`.
+7. **Never Invent Design Values:** Colors, fonts, spacing, radii, and any other visual value belong exclusively to the central theme files (`desktop/theme.py` for Python, `desktop/shell/theme.ts` for TypeScript). Never write a literal hex code, font name, or pixel value inline in a panel, widget, or shell file. If a token you need is not yet defined in the theme file, stop and ask the user for it, or insert a clearly marked `# TODO: theme value not yet defined` placeholder — never guess or default to a value you consider reasonable.
 
 ---
 
-## 2. SYSTEM ARCHITECTURE & PLATFORM SPECIFICATIONS
+## 2. SYSTEM ARCHITECTURE AND PLATFORM SPECIFICATIONS
 
-*   **Development Host:** Windows 11 with WSL2 (Ubuntu 24.04 LTS "Noble Numbat").
-*   **Target Hardware Target:** Lenovo ThinkPad T480 (Intel Core i5-8250U, 8GB RAM).
-*   **Target Virtualization Platforms:** Microsoft Hyper-V (Gen 2 UEFI), VirtualBox (VMSVGA + 3D), and VMware.
-*   **Operating System Base:** Minimal Ubuntu 24.04 LTS built via `debootstrap --variant=minbase`.
-*   **Graphics and Display Stack:** Wayland display architecture using the Hyprland C++ compositor, running on software fallback rendering (`llvmpipe`) inside virtual machines and native hardware graphics on bare metal.
-*   **Windows Software Compatibility:** Flatpak-isolated Bottles runner executing Wine with DXVK and VKD3D translation libraries.
+- **Development Host:** Windows 11 with WSL2 Ubuntu 24.04 LTS Noble Numbat
+- **Target Hardware:** Lenovo ThinkPad T480, Intel Core i5-8250U, 8GB RAM, Intel UHD 620 iGPU
+- **Target Virtualization:** Microsoft Hyper-V Gen 2 UEFI, VirtualBox VMSVGA plus 3D, VMware
+- **OS Base:** Minimal Ubuntu 24.04 LTS via debootstrap variant minbase
+- **Live Boot Stack:** Ubuntu native Casper stack. NOT Debian live-boot. These are incompatible.
+- **Display Stack:** Wayland via Hyprland compositor. Software fallback via llvmpipe inside VMs. Native iris Mesa driver on real ThinkPad hardware.
+- **Windows Compatibility:** Flatpak-isolated Bottles runner with Wine, DXVK, and VKD3D.
+- **GUI Framework:** Python PySide6 for scientific panels and workspace. TypeScript Astal v2 with Bun runtime for desktop shell bar and launcher.
+- **Kernel:** XanMod compiled via GitHub Actions using Ubuntu production baseline config with Kali mac80211 wireless injection patches.
 
 ---
 
-## 3. FILE SYSTEM & PROJECT LAYOUT
+## 3. FILE SYSTEM AND PROJECT LAYOUT
 
 ```
 ~/Xeno-os/
 ├── .github/
 │   └── workflows/
-│       └── build-kernel.yml       # Modular, multi-job Actions pipeline
-├── rootfs/                        # Minimal Ubuntu 24.04 chroot jail
+│       └── build-kernel.yml
+├── rootfs/
 │   ├── usr/bin/
-│   │   └── xeno-start-hyprland    # Automatic graphics driver fallback script
+│   │   └── xeno-start-hyprland      # VM detection and graphics fallback script
 │   ├── etc/systemd/system/
-│   │   └── xeno-session.service   # Systemd graphical session launcher
-│   └── [standard filesystem mount trees]
+│   │   └── xeno-session.service     # Graphical session launcher
+│   └── home/xeno/.config/hypr/
+│       └── hyprland.conf
 ├── kernel/
-│   ├── build-kernel.sh            # XanMod + Kali patch compiler script
-│   ├── patches/                   # mac80211 wireless injection patches
-│   └── output/                    # Staging directory for compiled .deb packages
+│   ├── build-kernel.sh
+│   ├── patches/
+│   └── output/
 ├── iso/
-│   ├── build/                     # Temporary staging workspace for xorriso
-│   │   ├── casper/                # Live kernel (vmlinuz), ramdisk (initrd), & filesystem.squashfs
-│   │   └── boot/grub/             # GRUB configurations & El Torito boot images
-│   └── output/                    # Final target storage for compiled ISOs
-├── desktop/                       # Workspace directory for all Phase 2 files
-│   ├── shell/                     # TypeScript Astal bar and launcher code
-│   └── panels/                    # Thread-safe PySide6 scientific widgets
+│   ├── build/
+│   │   ├── casper/                  # CASPER directory - vmlinuz, initrd, filesystem.squashfs
+│   │   │   ├── vmlinuz              # Kernel image
+│   │   │   ├── initrd               # Initramfs with casper hooks
+│   │   │   └── filesystem.squashfs  # Compressed rootfs
+│   │   └── boot/grub/
+│   │       ├── grub.cfg
+│   │       ├── i386-pc/eltorito.img
+│   │       └── i386-pc/            # GRUB modules
+│   └── output/                     # Final ISO files
+├── desktop/
+│   ├── theme.py                     # SINGLE SOURCE OF TRUTH for colors/fonts/spacing (Python side). User-defined. Never duplicated elsewhere.
+│   ├── shell/                       # Astal v2 TypeScript shell project
+│   │   ├── theme.ts                 # Mirrors theme.py token names for the TypeScript/Astal side. Must stay in sync.
+│   │   ├── app.ts                   # Entry point
+│   │   └── widget/                  # Bar, Launcher, Notifications
+│   └── panels/
+│       ├── base_panel.py            # MANDATORY BASE CLASS - all panels inherit this
+│       ├── math_panel.py
+│       ├── data_panel.py
+│       ├── code_panel.py
+│       ├── threed_panel.py
+│       └── signal_panel.py
 ├── scripts/
-│   ├── enter-rootfs.sh            # Chroot bind-mount helper script
-│   └── auto-build.sh              # Unified, local gh-cli API packaging script
-└── .cursorrules                   # Global system instructions and active logs (this file)
+│   ├── enter-rootfs.sh
+│   └── auto-build.sh
+└── .cursorrules                    # This file - read before generating any code
 ```
+
+**CRITICAL PATH RULE:** The live filesystem goes in `iso/build/casper/` NEVER in `iso/build/live/`. Ubuntu Casper looks for squashfs in the casper directory. Placing it in live will cause boot failure.
 
 ---
 
 ## 4. CRITICAL ENGINEERING RESOLUTIONS
 
-1.  **The Universal Driver Resolution:** To boot on hypervisors, the kernel configuration does not use `defconfig`. It uses the **Ubuntu Production Baseline** configuration cloned from the runner VM `/boot/config-$(uname -r)`. This builds all virtual drivers (`vboxguest`, `vboxvideo`, `hv_vmbus`, `hv_storvsc`, `hyperv_drm`) as active modules (`=m`). They use 0% active RAM unless the specific hypervisor hardware is physically detected.
-2.  **The Cryptographic Signature Bypass:** Standard baseline configs halt compiler runs by checking for Canonical’s private security keys (`CONFIG_SYSTEM_TRUSTED_KEYS`). The compile script overrides these parameters to blank strings `""` inside `build-kernel.sh` to allow signature-free, warning-free compilations.
-3.  **The Casper live-boot Purge:** Debian `live-boot` utilities collide with Ubuntu’s native `casper` stack, causing the initrd to loop and fail to mount SquashFS. The chroot environment explicitly purges all `live-boot` remnants and forces Casper deployment.
-4.  **Virtualization Fallback Script:** Hyper-V and some VirtualBox instances utilize virtualized frameless display adapters (`hyperv_drm`, `llvmpipe`) lacking direct Vulkan/OpenGL acceleration. If Hyprland tries to initialize on raw hardware calls, it will crash and leave a blank screen. The startup process runs via `/usr/bin/xeno-start-hyprland`, which dynamically detects virtualization and exports software-rendering overrides:
-    *   `export WLR_RENDERER_ALLOW_SOFTWARE=1`
-    *   `export WLR_NO_HARDWARE_CURSORS=1`
-    *   `export LIBGL_ALWAYS_SOFTWARE=true`
-    *   `export GALLIUM_DRIVER=llvmpipe`
-5.  **ISO File-Size Level 3 Bypass:** Because the final operating system contains GIMP, GFortran, Octave, and scientific dependencies, the SquashFS image exceeds $4\text{ GB}$. Standard ISO9660 restricts single-file reads beyond this boundary. All ISO builds are executed via a custom `xorriso-wrapper.sh` injecting `-iso-level 3` to support massive compressed file tables under UEFI.
-6.  **WSL2 Local Path Case-Sensitivity:** The build script uses dynamic workspace path detection (`WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`) to eliminate hardcoded folder naming case collisions (such as `xeno-os` vs `Xeno-os`).
+**Resolution 1 — Universal Driver Strategy**
+The kernel does not use `make x86_64_defconfig`. It uses the Ubuntu Production Baseline cloned from the GitHub Actions runner at `/boot/config-$(uname -r)`. This includes all virtual machine drivers as modules: vboxguest, vboxvideo, hv_vmbus, hv_storvsc, hyperv_drm. They consume zero RAM unless the hypervisor hardware is detected.
 
----
+**Resolution 2 — Cryptographic Signature Bypass**
+Ubuntu baseline configs check for Canonical's private signing keys. The build script overrides `CONFIG_SYSTEM_TRUSTED_KEYS=""` and `CONFIG_SYSTEM_REVOCATION_KEYS=""` to allow compilation without Canonical's keys.
 
-## 5. CODE-LEVEL AI GUARDRAILS (CRITICAL COMPILE RULES)
+**Resolution 3 — Casper Not live-boot**
+Debian live-boot collides with Ubuntu's casper stack at initrd time causing filesystem mount failure. The rootfs must have casper installed and live-boot completely purged. The squashfs file must be at `iso/build/casper/filesystem.squashfs`. The GRUB kernel line must include `boot=casper` not `boot=live`.
 
-### GUARDRAIL A: Multi-Threading Memory Bounds (PySide6 / Qt6)
-All visual redrawing, widget configuration, and OpenGL buffer bindings **MUST** execute strictly on the Main GUI Thread. Background calculations (SymPy equations, SciPy signal analysis, Pandas parsing) must occur inside an isolated `QThread` using a worker pattern.
-
-*   **Forbidden Pattern (Do Not Generate):**
-    ```python
-    # ❌ FORBIDDEN: Writing direct UI modifications inside a background thread loop
-    def run_calculation(panel):
-        panel.status_label.setText("Calculating...")  # ❌ Crash
-        result = scipy_heavy_calculation()
-        panel.matplotlib_canvas.draw()                # ❌ Crash (SIGSEGV)
-    ```
-*   **Enforced Pattern (Must Generate):**
-    ```python
-    #   ENFORCED: Segment execution via Qt Signals and Slots (QueuedConnection)
-    class CalculationWorker(QObject):
-        result_ready = Signal(dict)
-        def compute(self):
-            res = scipy_heavy_calculation()
-            self.result_ready.emit({"data": res})
-
-    class MathPanel(QWidget):
-        def __init__(self):
-            super().__init__()
-            self.worker = CalculationWorker()
-            # Always connect using QueuedConnection to jump thread boundaries safely
-            self.worker.result_ready.connect(self.on_result, Qt.QueuedConnection)
-            
-        @Slot(dict)
-        def on_result(self, payload):
-            # This method runs strictly on the main GUI thread
-            self.status_label.setText("Done")
-            self.matplotlib_canvas.draw()
-    ```
-
-### GUARDRAIL B: Astal (v2) vs. Legacy AGS (v1) Syntax Boundaries
-Do not import legacy AGS components or configuration endpoints. Under TypeScript and Bun, you must strictly construct modules using modern Astal v2 namespaces and GObject wrappers.
-
-*   **Forbidden Imports (Do Not Generate):**
-    ```javascript
-    // ❌ FORBIDDEN: Legacy AGS v1 resource scopes
-    import Widget from 'resource:///org/aylur/ags/widget.js';
-    import App from 'resource:///org/aylur/ags/app.js';
-    ```
-*   **Enforced Imports (Must Generate):**
-    ```typescript
-    //   ENFORCED: Modern Astal v2 syntax
-    import { App, Astal, Gtk, Gdk } from "astal/gtk3";
-    import { Variable } from "astal";
-    ```
-
-### GUARDRAIL C: CPU Software Rasterization Optimization (Mesa LLVMpipe)
-Because the OS running inside Hyper-V uses software-based CPU rasterization, you must optimize layouts to minimize CPU cycle spikes:
-1.  **Solid Backgrounds:** Use solid backgrounds (`rgba(13, 13, 26, 0.95)` with very high opacity) rather than dynamic semi-transparent blur frames.
-2.  **No Backdrop CSS Blurs:** Never generate `backdrop-filter: blur(...)` or dynamic graphical shadow computations in your Astal layouts.
-3.  **Static Geometries:** Define explicit widget dimensions. Avoid dynamic self-adjusting padding parameters that force the software renderer to compute window geometries on every frame.
-4.  **Low Refresh Frequencies:** Set clock, battery, and network polling variables to low refresh rates (e.g., $1\text{ Hz}$ or $5\text{ Hz}$) instead of high-frequency render loops.
-
----
-
-## 6. STANDARDIZED CORE DEPENDENCIES
-
-The target `rootfs` is configured with these specific system packages:
-*   **System Core:** `systemd`, `systemd-sysv`, `casper`, `udev`, `NetworkManager`.
-*   **Rendering & WM:** `hyprland`, `xwayland`, `kitty`, `wofi`, `dunst`, `grim`, `slurp`, `swww`, `brightnessctl`.
-*   **Scientific and Utilities:** `python3`, `python3-pip`, `octave`, `maxima`, `blender`, `gimp`, `krita`, `kdenlive`, `obs-studio`, `audacity`, `vlc`, `mpv`, `ffmpeg`, `htop`, `btop`, `fastfetch`, `tmux`, `alsa-utils`, `micro`, `fzf`.
-
----
-
-## 7. LOGGING DIRECTIVE FOR AI DEVELOPMENT SESSIONS
-
-Whenever you modify, add, or test any files, configurations, or packaging parameters, you must follow this sequence:
-1.  Open `~/Xeno-os/.cursorrules`.
-2.  Scroll to the bottom under **`## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG`**.
-3.  Add a horizontal rule (`---`) followed by your detailed briefing using the template below. **Do not modify previous log entries.**
-
-### **Work Briefing Template:**
+**Resolution 4 — VM Graphics Fallback**
+Hyper-V and VirtualBox lack Vulkan support. Hyprland crashes without the correct environment. The `/usr/bin/xeno-start-hyprland` script detects virtualization via `systemd-detect-virt` and exports these variables before launching Hyprland:
 ```
-### **[DATE / TIME] - Session Briefing**
-*   **Primary Objective:** [Briefly state the goal of your edit]
-*   **Changes Made:**
-    *   `[File Path 1]`: [Detailed changes, logic modifications, packages added]
-    *   `[File Path 2]`: [Detailed changes]
-*   **Compilation Outcome:** [State if compilation passed, warnings received, or if repackaged into a fresh ISO]
-*   **Tested In:** [VirtualBox / Hyper-V / Bare-metal ThinkPad T480]
-*   **Diagnostic Findings:** [State the outcome of the boot check (e.g., uname -r, systemd state, modules loaded)]
-*   **Next Steps Staged:** [Specific recommendations for the next development iteration]
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+export WLR_NO_HARDWARE_CURSORS=1
+export LIBGL_ALWAYS_SOFTWARE=true
+export GALLIUM_DRIVER=llvmpipe
+export __GLX_VENDOR_LIBRARY_NAME=mesa
+```
+On bare metal these variables are not set and native hardware drivers are used.
+
+**Resolution 5 — ISO Level 3 for Files Over 4GB**
+The squashfs exceeds 4GB due to scientific packages. All xorriso commands must include `-iso-level 3`. The GRUB volume ID must be 8 characters or fewer with only uppercase letters and numbers, for example XENOOS.
+
+**Resolution 6 — WSL2 Path Case Sensitivity**
+Scripts must use dynamic path detection not hardcoded paths. Use `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"` in all scripts.
+
+**Resolution 7 — Casper GRUB Parameters**
+The correct GRUB kernel line for Ubuntu Casper is:
+```
+linux /casper/vmlinuz boot=casper quiet splash hostname=xeno-os ---
+initrd /casper/initrd
+```
+Not `boot=live`. Not `/boot/vmlinuz`. Not `/boot/initrd.img`.
+
+---
+
+## 5. CODE-LEVEL AI GUARDRAILS
+
+### GUARDRAIL A — Multi-Threading Memory Bounds (PySide6 Mandatory Pattern)
+
+All visual redrawing, widget configuration, and matplotlib draw calls MUST execute on the Main GUI Thread only. Background calculations happen in QThread workers.
+
+**Mandatory import order for every panel file — this exact order, no exceptions:**
+```python
+# STEP 1: Set matplotlib backend BEFORE any other matplotlib import
+import matplotlib
+matplotlib.use('Agg')
+
+# STEP 2: Now import matplotlib components
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
+# STEP 3: PySide6 imports
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QApplication
+from PySide6.QtCore import QThread, Signal, QObject, Qt, QMetaObject, Q_ARG
+
+# STEP 4: Central theme — never hardcode colors/fonts/spacing in this file
+from desktop.theme import theme
+
+# STEP 5: Scientific libraries
+import numpy as np
+import sympy as sp
+
+# STEP 6: Standard library
+import sys
+import os
 ```
 
+**Forbidden pattern — never generate this:**
+```python
+# FORBIDDEN: Any UI or matplotlib operation inside a thread
+class Worker(QThread):
+    def run(self):
+        self.panel.label.setText("Done")      # CRASH - wrong thread
+        self.canvas.draw()                     # CRASH - SIGSEGV
+        self.fig.savefig("out.png")           # CRASH - wrong thread
+```
+
+**Enforced pattern — always generate this:**
+```python
+# ENFORCED: Worker only computes, emits data via signal
+class Worker(QObject):
+    result_ready = Signal(dict)
+    error_occurred = Signal(str)
+
+    def compute(self, input_data):
+        try:
+            result = heavy_computation(input_data)
+            self.result_ready.emit({"data": result})
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+
+# Panel receives data on main thread via QueuedConnection
+class Panel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self._thread = QThread()
+        self._worker = Worker()
+        self._worker.moveToThread(self._thread)
+        self._worker.result_ready.connect(
+            self.on_result, Qt.QueuedConnection
+        )
+        self._worker.error_occurred.connect(
+            self.on_error, Qt.QueuedConnection
+        )
+        self._thread.start()
+
+    def on_result(self, payload):
+        # SAFE: Runs on main thread
+        self.canvas.draw()
+        self.label.setText(str(payload["data"]))
+
+    def on_error(self, msg):
+        # SAFE: Runs on main thread
+        self.label.setText(f"Error: {msg}")
+```
+
+### GUARDRAIL B — Astal v2 Syntax Enforcement
+
+**Forbidden — legacy AGS v1:**
+```javascript
+import Widget from 'resource:///org/aylur/ags/widget.js';
+import App from 'resource:///org/aylur/ags/app.js';
+import Service from 'resource:///org/aylur/ags/service.js';
+```
+
+**Enforced — Astal v2:**
+```typescript
+import { App, Astal, Gtk, Gdk } from "astal/gtk3";
+import { Variable, GLib, bind } from "astal";
+import Hyprland from "gi://AstalHyprland";
+import Network from "gi://AstalNetwork";
+import Battery from "gi://AstalBattery";
+import Wp from "gi://AstalWp";
+import { theme } from "./theme"; // central token source, never inline hex/fonts here
+```
+
+### GUARDRAIL C — VM Software Rendering Optimization
+
+Because llvmpipe is CPU-based rasterization with no GPU acceleration:
+
+1. **Solid backgrounds only.** Backgrounds must use a theme token whose opacity is baked directly into the token value (e.g. an 8-digit hex `RRGGBBAA`) at ≥0.9 opacity — chosen by the user in `theme.py` / `theme.ts`, not invented per-file. Never use CSS `backdrop-filter: blur()`. Never use CSS `box-shadow` with large blur radii.
+2. **No dynamic blur.** Hyprland blur is disabled in VM mode by xeno-start-hyprland. Do not depend on it.
+3. **No drop shadows in Astal.** CSS shadows cause full widget redraws on every frame in software rendering.
+4. **Static dimensions.** Always specify explicit pixel widths and heights, pulled from the theme's spacing/sizing tokens. Never use percentage-based dynamic sizing that recalculates on resize.
+5. **Low polling rates.** Clock: 1 second interval. Battery: 30 second interval. Network: 15 second interval. Volume: 3 second interval only when a change event fires.
+
+### GUARDRAIL D — Mandatory Standalone Test Requirement
+
+Every single Python panel file must end with this block. Without it the file is considered incomplete:
+
+```python
+if __name__ == "__main__":
+    import sys
+    app = QApplication(sys.argv)
+    w = PanelClassName()
+    w.resize(900, 600)
+    w.setWindowTitle("Xeno OS — PanelName Test")
+    w.show()
+    sys.exit(app.exec())
+```
+
+### GUARDRAIL E — Casper Boot Path Enforcement
+
+The words `iso/build/live` must never appear in any command you generate. The correct path is always `iso/build/casper`. The squashfs file is always at `iso/build/casper/filesystem.squashfs`. The kernel is at `iso/build/casper/vmlinuz`. The initrd is at `iso/build/casper/initrd`.
+
 ---
 
-## 8. SYSTEM REVISION HISTORY & DEVELOPMENT LOG
+## 6. XENO OS THEME SYSTEM (USER-DEFINED VALUES — DO NOT HARDCODE)
 
-### **July 2, 2026 - Session 1 Briefing**
-*   **Primary Objective:** Consolidate Phase 1, fix the Canonical Signature (Error 2) compile bug, address the Hyper-V blank-screen error, and establish an automated development checkpoint ruleset.
-*   **Changes Made:**
-    *   `.github/workflows/build-kernel.yml`: Refactored into a dependent, multi-job workflow (`compile_kernel` -> `publish_release`) to prevent 3-hour compile runs during release failures. Extended execution limits to 360-minutes and integrated pre-checkout storage-cleaning commands to prevent disk exhaustion. Integrated `libdw-dev`, `rsync`, and `kmod` dependencies.
-    *   `scripts/auto-build.sh`: Fully automated development script using the authenticated `gh` CLI API download triggers. Replaced the hardcoded path with dynamic workspace parent-directory resolution (`WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`) to eliminate case-sensitivity folder collisions (`Xeno-os` vs `xeno-os`).
-    *   `rootfs/usr/bin/xeno-start-hyprland`: Created dynamic virtualization-detection graphics wrapper. Automatically exports software-rendering environment variables (`WLR_RENDERER_ALLOW_SOFTWARE=1`, `GALLIUM_DRIVER=llvmpipe`, etc.) when executing inside Hyper-V, VirtualBox, or VMware.
-    *   `rootfs/etc/systemd/system/xeno-session.service`: Reconfigured default launcher path to execute through the newly integrated `xeno-start-hyprland` graphics fallback wrapper.
-    *   `iso/build/boot/grub/grub.cfg`: Injected `hostname=xeno-os` into the GRUB bootloader parameters to prevent Casper live-boot from resetting the live hostname to `ubuntu` at runtime.
-    *   `rootfs` Packages: Added permanent built-in utilities (`tmux`, `alsa-utils`, `micro`, `fzf`) inside the SquashFS chroot layer.
-*   **Compilation Outcome:** Workflow compiled, packages generated without warnings, and ISO packaged into `xeno_os-alpha-v_02.0.iso`.
-*   **Tested In:** Microsoft Hyper-V (Gen 2 UEFI) and VirtualBox (VMSVGA + 3D).
-*   **Diagnostic Findings:** VM successfully boots directly into the live compositor shell on TTY1 without going blank. System correctly registers the live hostname `xeno-os` and loads Hyper-V core communication modules natively.
-*   **Next Steps Staged:** Awaiting user verification and direct instruction to initiate Phase 2 (GUI Development and XenoSense integration).
+All visual identity for Xeno OS — colors, typography, spacing, radii, iconography sizing — is decided by the user, not the AI. This section defines the **token schema only** (the names every panel and shell component is allowed to reference). It intentionally contains **no colors, no font names, no pixel values**. Those live exclusively in `desktop/theme.py` (Python/PySide6 side) and `desktop/shell/theme.ts` (TypeScript/Astal side), which the user authors and edits directly.
 
+**Rule for any AI working in this repo:** never write a literal hex code, font family, or px/rem value inline in a panel, widget, or stylesheet string. Always reference the token by name through the theme module. If a token below is missing a value in `theme.py`/`theme.ts`, stop and either ask the user for it or leave an explicit placeholder — do not substitute a value you think looks reasonable.
+
+### `desktop/theme.py` — Python single source of truth (fill in yourself)
+```python
+"""
+XENO OS THEME — SINGLE SOURCE OF TRUTH (Python / PySide6 side)
+Every value below is None until the user defines it. No panel file may
+redefine, duplicate, or override these — import `theme` instead.
+"""
+
+class XenoTheme:
+    # ---- Colors ----
+    bg           = None   # main background
+    surface      = None   # panel surface
+    surface_2    = None   # raised elements / hover states
+    border       = None   # borders and dividers
+    border_glow  = None   # accent border, opacity baked into the hex itself
+    accent       = None   # primary accent
+    accent_2     = None   # secondary accent
+    accent_hover = None   # accent hover state
+    text         = None   # primary text
+    text_dim     = None   # secondary / placeholder text
+    text_muted   = None   # disabled / hint text
+    success      = None
+    warning      = None
+    error        = None
+    overlay      = None   # semi-transparent overlay, alpha baked into the hex
+
+    # ---- Typography ----
+    font_primary = None   # e.g. a body/UI font of the user's choice
+    font_mono    = None   # e.g. a monospace font of the user's choice
+    size_xs   = None       # timestamps, metadata
+    size_sm   = None       # secondary labels, hints
+    size_base = None       # body text, labels
+    size_md   = None       # section headers
+    size_lg   = None       # panel titles
+    size_xl   = None       # workspace titles
+    size_2xl  = None       # clock display
+    size_3xl  = None       # login screen clock
+
+    # ---- Spacing & Geometry ----
+    radius_sm   = None     # small elements like tags
+    radius_md   = None     # panels and cards
+    radius_lg   = None     # overlays and launchers
+    radius_full = None     # circular elements
+    space_xs = None
+    space_sm = None
+    space_md = None
+    space_lg = None
+    space_xl = None
+    panel_padding    = None
+    sidebar_width    = None
+    topbar_height    = None
+    icon_sm  = None
+    icon_md  = None
+    icon_lg  = None
+    touch_target_min = None
+
+theme = XenoTheme()
+```
+
+### `desktop/shell/theme.ts` — TypeScript mirror for the Astal shell
+```typescript
+// XENO OS THEME — mirrors theme.py token names for the Astal/TypeScript side.
+// Keep every key here in sync with desktop/theme.py. Values are user-defined.
+export const theme = {
+  bg: undefined,
+  surface: undefined,
+  surface2: undefined,
+  border: undefined,
+  borderGlow: undefined,
+  accent: undefined,
+  accent2: undefined,
+  accentHover: undefined,
+  text: undefined,
+  textDim: undefined,
+  textMuted: undefined,
+  success: undefined,
+  warning: undefined,
+  error: undefined,
+  overlay: undefined,
+
+  fontPrimary: undefined,
+  fontMono: undefined,
+  sizeXs: undefined,
+  sizeSm: undefined,
+  sizeBase: undefined,
+  sizeMd: undefined,
+  sizeLg: undefined,
+  sizeXl: undefined,
+  size2xl: undefined,
+  size3xl: undefined,
+
+  radiusSm: undefined,
+  radiusMd: undefined,
+  radiusLg: undefined,
+  radiusFull: undefined,
+  spaceXs: undefined,
+  spaceSm: undefined,
+  spaceMd: undefined,
+  spaceLg: undefined,
+  spaceXl: undefined,
+  panelPadding: undefined,
+  sidebarWidth: undefined,
+  topbarHeight: undefined,
+  iconSm: undefined,
+  iconMd: undefined,
+  iconLg: undefined,
+  touchTargetMin: undefined,
+};
+```
+
+### PySide6 Stylesheet Template
+Every panel imports `theme` from `desktop/theme.py` and references tokens dynamically — no raw hex/px in the f-string itself:
+```python
+from desktop.theme import theme
+
+PANEL_STYLE = f"""
+QWidget {{
+    background-color: {theme.surface};
+    color: {theme.text};
+    font-family: {theme.font_primary};
+    font-size: {theme.size_base}px;
+}}
+QLineEdit {{
+    background-color: {theme.bg};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: {theme.radius_sm}px;
+    padding: {theme.space_sm}px {theme.space_md}px;
+    font-size: {theme.size_base}px;
+}}
+QLineEdit:focus {{
+    border-color: {theme.accent};
+}}
+QPushButton {{
+    background-color: {theme.surface_2};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: {theme.radius_sm}px;
+    padding: {theme.space_sm}px {theme.space_md}px;
+    font-size: {theme.size_base}px;
+    min-height: {theme.touch_target_min}px;
+}}
+QPushButton:hover {{
+    background-color: {theme.accent};
+    color: {theme.bg};
+    border-color: {theme.accent};
+}}
+QPushButton:pressed {{
+    background-color: {theme.accent_2};
+}}
+QLabel {{
+    color: {theme.text};
+    background-color: transparent;
+}}
+QScrollBar:vertical {{
+    background: {theme.bg};
+    width: 8px;
+    border-radius: {theme.radius_sm}px;
+}}
+QScrollBar::handle:vertical {{
+    background: {theme.border};
+    border-radius: {theme.radius_sm}px;
+    min-height: 20px;
+}}
+QScrollBar::handle:vertical:hover {{
+    background: {theme.accent};
+}}
+"""
+```
 
 ---
+
+## 7. COMPLETE BASE PANEL ARCHITECTURE
+
+This is the mandatory base class. Every scientific panel inherits from either BasePanel or MatplotlibPanel. Never modify this class. Never regenerate it. Only extend it. All visual values come from the central `theme` object — this file must never define its own color/font/spacing constants.
+
+```python
+# FILE: ~/Xeno-os/desktop/panels/base_panel.py
+# PURPOSE: Thread-safe base class for all Xeno OS scientific panels
+# RULE: matplotlib.use('Agg') MUST be called before any other matplotlib import
+# RULE: All visual values come from desktop/theme.py — never redefine them here
+
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+import numpy as np
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QApplication
+from PySide6.QtCore import QThread, Signal, QObject, Qt, QMetaObject
+
+from desktop.theme import theme
+
+
+class BaseWorker(QObject):
+    """
+    Background computation worker.
+    RULE: Never touch any Qt widget or matplotlib object from here.
+    RULE: Always emit result_ready or error_occurred before returning.
+    """
+    result_ready   = Signal(object)
+    error_occurred = Signal(str)
+    progress       = Signal(int)
+
+    def compute(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Subclass BaseWorker and override compute()"
+        )
+
+
+class BasePanel(QWidget):
+    """
+    Base class for all Xeno OS scientific panels.
+    RULE: Never call canvas.draw() outside of on_result() or on_error().
+    RULE: Never do heavy computation in create_ui() or on_result().
+    RULE: Always call trigger_compute() to start background work.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("XenoPanel")
+        self.setStyleSheet(
+            f"QWidget#XenoPanel {{"
+            f"  background: {theme.surface};"
+            f"  border: 1px solid {theme.border};"
+            f"  border-radius: {theme.radius_md}px;"
+            f"}}"
+        )
+
+        self._thread = QThread()
+        self._worker = self.create_worker()
+        self._worker.moveToThread(self._thread)
+        self._worker.result_ready.connect(
+            self.on_result, Qt.QueuedConnection
+        )
+        self._worker.error_occurred.connect(
+            self.on_error, Qt.QueuedConnection
+        )
+        self._worker.progress.connect(
+            self.on_progress, Qt.QueuedConnection
+        )
+        self._thread.start()
+
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(
+            theme.panel_padding, theme.panel_padding,
+            theme.panel_padding, theme.panel_padding
+        )
+        self._layout.setSpacing(theme.space_md)
+        self.create_ui()
+
+    def create_worker(self) -> BaseWorker:
+        return BaseWorker()
+
+    def create_ui(self):
+        pass
+
+    def on_result(self, result):
+        pass
+
+    def on_error(self, error_msg: str):
+        print(f"[XenoPanel Error] {error_msg}")
+
+    def on_progress(self, value: int):
+        pass
+
+    def trigger_compute(self, *args):
+        QMetaObject.invokeMethod(
+            self._worker,
+            "compute",
+            Qt.QueuedConnection,
+            *[arg for arg in args]
+        )
+
+    def make_matplotlib_canvas(self, figsize=(7, 3.5)):
+        fig = Figure(figsize=figsize, facecolor=theme.bg)
+        canvas = FigureCanvasQTAgg(fig)
+        ax = fig.add_subplot(111)
+        ax.set_facecolor(theme.bg)
+        ax.tick_params(colors=theme.text_dim, labelsize=10)
+        ax.xaxis.label.set_color(theme.text_dim)
+        ax.yaxis.label.set_color(theme.text_dim)
+        for spine in ax.spines.values():
+            spine.set_edgecolor(theme.border)
+        fig.tight_layout(pad=1.5)
+        return canvas, fig, ax
+
+    def closeEvent(self, event):
+        self._thread.quit()
+        self._thread.wait(3000)
+        super().closeEvent(event)
+
+
+class MatplotlibPanel(BasePanel):
+    """
+    Convenience subclass for panels that embed a single matplotlib chart.
+    Access via self.canvas, self.fig, self.ax.
+    Call self.refresh_canvas() after modifying the plot in on_result().
+    refresh_canvas() is ONLY safe to call from on_result() on the main thread.
+    """
+
+    def __init__(self, parent=None):
+        self._canvas = None
+        self._fig = None
+        self._ax = None
+        super().__init__(parent)
+
+    def create_ui(self):
+        self._canvas, self._fig, self._ax = self.make_matplotlib_canvas()
+        self._layout.addWidget(self._canvas)
+
+    @property
+    def canvas(self):
+        return self._canvas
+
+    @property
+    def fig(self):
+        return self._fig
+
+    @property
+    def ax(self):
+        return self._ax
+
+    def refresh_canvas(self):
+        """Call ONLY from on_result() on the main thread."""
+        try:
+            self._fig.tight_layout(pad=1.5)
+            self._canvas.draw()
+        except Exception as e:
+            print(f"[Canvas refresh error] {e}")
+```
+
+---
+
+## 8. PHASE 2 COMPONENT INVENTORY
+
+This is the complete list of GUI components to build. Each one is a separate file. Build and test each one individually before moving to the next. Never build two at once.
+
+| Order | Component | File | Framework | Status |
+|---|---|---|---|---|
+| 1 | Theme (single source of truth) | desktop/theme.py, desktop/shell/theme.ts | Python / TypeScript | Define first, by hand |
+| 2 | Base Panel Architecture | desktop/panels/base_panel.py | PySide6 | Define second |
+| 3 | Math Solver | desktop/panels/math_panel.py | PySide6 + SymPy | Phase 2 |
+| 4 | Data Analysis | desktop/panels/data_panel.py | PySide6 + Pandas + Plotly | Phase 2 |
+| 5 | Code Notebook | desktop/panels/code_panel.py | PySide6 + qtconsole | Phase 2 |
+| 6 | 3D Viewer | desktop/panels/threed_panel.py | PySide6 + VTK | Phase 2 |
+| 7 | Signal Analysis | desktop/panels/signal_panel.py | PySide6 + SciPy | Phase 2 |
+| 8 | Main Workspace | desktop/workspace.py | PySide6 | Phase 2 |
+| 9 | Settings Center | desktop/settings.py | PySide6 | Phase 2 |
+| 10 | File Manager | desktop/filemanager.py | PySide6 | Phase 2 |
+| 11 | Login Screen | desktop/loginscreen.py | PySide6 | Phase 2 |
+| 12 | Desktop Shell Bar | desktop/shell/app.ts | Astal v2 TypeScript | Phase 2 |
+| 13 | App Launcher | desktop/shell/widget/Launcher.ts | Astal v2 TypeScript | Phase 2 |
+| 14 | Notifications | desktop/shell/widget/Notifications.ts | Astal v2 TypeScript | Phase 2 |
+| 15 | XenoSense Daemon | desktop/xenosense/xenosense.py | Python threading | Phase 2 |
+| 16 | Gesture Bridge | desktop/xenosense/gesture_bridge.py | Python socket | Phase 2 |
+
+---
+
+## 9. XENOSENSE SOCKET PROTOCOL
+
+All XenoSense events are emitted as single-line JSON on Unix socket `/tmp/xeno-sense.sock`. Every component subscribing to XenoSense must handle these schemas and gracefully handle the socket being unavailable.
+
+```json
+{"type": "gesture_detected", "gesture": "SWIPE_LEFT", "confidence": 0.92, "timestamp": 1234567890.123}
+{"type": "gesture_detected", "gesture": "SWIPE_RIGHT", "confidence": 0.88, "timestamp": 1234567890.456}
+{"type": "gesture_detected", "gesture": "FIST", "confidence": 0.95, "timestamp": 1234567890.789}
+{"type": "gesture_detected", "gesture": "OPEN_PALM", "confidence": 0.91, "timestamp": 1234567890.012}
+{"type": "face_detected", "person": "xeno", "confidence": 0.97, "timestamp": 1234567890.345}
+{"type": "face_absent", "duration_seconds": 32, "timestamp": 1234567890.678}
+{"type": "speech_command", "command": "open math", "full_transcript": "hey xeno open math", "timestamp": 1234567890.901}
+{"type": "speech_result", "text": "full transcription here", "timestamp": 1234567890.234}
+{"type": "sound_event", "sound_type": "clap", "energy": 0.87, "timestamp": 1234567890.567}
+```
+
+Gesture name enum: SWIPE_LEFT, SWIPE_RIGHT, SWIPE_UP, SWIPE_DOWN, PINCH_OPEN, PINCH_CLOSE, FIST, OPEN_PALM, PEACE, POINT
+
+---
+
+## 10. STANDARDIZED CORE DEPENDENCIES
+
+**System Core:** systemd, systemd-sysv, casper, udev, NetworkManager
+
+**Graphics and WM:** hyprland, xwayland, kitty, wofi, dunst, grim, slurp, swww, brightnessctl, mesa-vulkan-drivers, libgl1-mesa-dri
+
+**Python Scientific:** python3, python3-pip, numpy, scipy, matplotlib, sympy, pandas, seaborn, plotly, scikit-learn, statsmodels, jupyterlab, qtconsole, vtk, open3d, ipykernel, PySide6
+
+**Creative Tools:** octave, maxima, blender, gimp, krita, kdenlive, obs-studio, audacity, vlc, mpv, ffmpeg
+
+**Utilities:** htop, btop, fastfetch, tmux, alsa-utils, micro, fzf, git, curl, wget
+
+**XenoSense ML:** mediapipe, opencv-python-headless, faster-whisper, sounddevice, face-recognition
+
+---
+
+## 11. STANDARDIZED DEPENDENCIES
+
+**Logging Directive:** Whenever you modify, add, or test any file, follow this sequence: open this file, scroll to Section 12, add a horizontal rule followed by your detailed briefing using the template below. Do not modify previous log entries.
+
+**Work Briefing Template:**
+```
+### [DATE TIME] - Session Briefing
+- Primary Objective: briefly state the goal
+- Changes Made:
+  - [File Path]: detailed changes made
+- Compilation Outcome: passed, warnings, or failed with reason
+- Tested In: VirtualBox, Hyper-V, or bare metal ThinkPad T480
+- Diagnostic Findings: what uname -r showed, systemd state, modules loaded
+- Next Steps: specific recommendations for next iteration
+```
+
+---
+
+## 12. SYSTEM REVISION HISTORY AND DEVELOPMENT LOG
+
+### July 2, 2026 - Session 1 Briefing
+- Primary Objective: Consolidate Phase 1, fix Canonical Signature compile bug, address Hyper-V blank screen, establish automated development checkpoint ruleset.
+- Changes Made:
+  - .github/workflows/build-kernel.yml: Refactored into dependent multi-job workflow compile_kernel then publish_release. Extended execution limits to 360 minutes. Integrated libdw-dev rsync kmod dependencies. Added storage cleaning step to prevent disk exhaustion.
+  - scripts/auto-build.sh: Full automation using gh CLI API. Dynamic workspace path detection eliminating case sensitivity collisions.
+  - rootfs/usr/bin/xeno-start-hyprland: VM detection script with automatic software rendering environment variable export.
+  - rootfs/etc/systemd/system/xeno-session.service: Reconfigured to execute through xeno-start-hyprland wrapper.
+  - iso/build/boot/grub/grub.cfg: Added hostname=xeno-os parameter to prevent Casper resetting hostname to ubuntu.
+  - rootfs packages: Added tmux, alsa-utils, micro, fzf.
+- Compilation Outcome: Workflow compiled, packages generated without warnings, ISO packaged as xeno_os-alpha-v_02.0.iso.
+- Tested In: Microsoft Hyper-V Gen 2 UEFI and VirtualBox VMSVGA plus 3D.
+- Diagnostic Findings: VM boots into live compositor on TTY1 without blank screen. Hostname correctly registers as xeno-os. Hyper-V core communication modules load natively.
+- Next Steps: Awaiting user verification and direct instruction to initiate Phase 2.
+
+### July 6, 2026 - Session 2 Briefing
+- Primary Objective: Decouple design language from hardcoded values so the user defines all colors, typography, and spacing themselves rather than the AI presupposing them.
+- Changes Made:
+  - .cursorrules Section 1: Added Rule 7 forbidding inline/invented design values; AI must import from the central theme module or ask.
+  - .cursorrules Section 3: Added desktop/theme.py and desktop/shell/theme.ts to the project layout as the single source of truth.
+  - .cursorrules Section 5, Guardrail A: Added theme import as a mandatory step in the panel import order.
+  - .cursorrules Section 5, Guardrail B: Added theme import to the Astal v2 enforced snippet.
+  - .cursorrules Section 5, Guardrail C: Generalized the VM-rendering rule to reference a theme opacity token instead of a literal rgba value.
+  - .cursorrules Section 6: Replaced the fixed color/typography/spacing values with an empty token schema (all `None`/`undefined`) in `theme.py` and `theme.ts`, to be filled in by the user; updated the PySide6 stylesheet template to reference `theme.*` dynamically.
+  - .cursorrules Section 7: Rewrote base_panel.py to import `theme` instead of defining local XENO_* constants.
+  - .cursorrules Section 8: Reordered inventory so the theme files are built and filled in before base_panel.py.
+- Compilation Outcome: Not applicable — documentation/rules change only, no code executed or built this session.
+- Tested In: Not applicable.
+- Diagnostic Findings: Not applicable.
+- Next Steps: User defines actual values in desktop/theme.py and desktop/shell/theme.ts before any panel or shell code is generated against them.
