@@ -3,7 +3,7 @@ set -e
 
 REPO="YOURGITHUBUSERNAME/xeno-os" # The script will automatically detect this from git, but falls back here
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-TARGET_ISO="/mnt/c/Users/harsh/xeno_os-alpha-v_02.0.iso"
+TARGET_ISO="/mnt/c/Users/harsh/xeno_os-alpha-v_02.5.iso"
 
 cd "$WS_DIR"
 
@@ -22,25 +22,13 @@ if [ -n "$DETECTED_REPO" ]; then
 fi
 echo "Targeting Repository: $REPO"
 
-# 2. Query latest successful Actions run for the kernel artifact
-echo "Querying GitHub for the latest successful kernel compilation..."
-RUN_ID=$(gh run list --workflow="build-kernel.yml" --status=success --limit 1 --json databaseId --jq '.[0].databaseId')
-
-if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-    echo "ERROR: No successful kernel build runs found on GitHub Actions yet."
-    echo "Please wait for your active GitHub Action run to finish and turn green."
-    exit 1
-fi
-
-echo "Found successful run ID: $RUN_ID"
-
-# 3. Download the .deb packages automatically using the API
-echo "Downloading custom kernel deb artifacts..."
+# 2. Query and download the latest kernel packages from GitHub Releases
+echo "Downloading custom kernel deb packages from the latest GitHub Release..."
 sudo rm -rf rootfs/tmp/kernel-debs
 sudo mkdir -p rootfs/tmp/kernel-debs
 sudo chown -R xeno:xeno rootfs/tmp/kernel-debs
 
-gh run download "$RUN_ID" -n xeno-kernel-debs -D rootfs/tmp/kernel-debs
+gh release download -R "$REPO" --pattern "*.deb" -D rootfs/tmp/kernel-debs
 
 # Verify debs exist
 if [ ! -f rootfs/tmp/kernel-debs/linux-image-*.deb ]; then
@@ -113,11 +101,11 @@ sudo cp -r /usr/lib/grub/i386-pc/* iso/build/boot/grub/i386-pc/ 2>/dev/null || t
 grub-mkimage -O i386-pc -o iso/build/boot/grub/i386-pc/eltorito.img -p '(cd0)/boot/grub' iso9660 biosdisk normal
 
 # 9. Create final ISO and copy to Windows Desktop
-echo "Generating bootable xeno_os-alpha-v_02.0.iso..."
-sudo grub-mkrescue --xorriso=$(pwd)/xorriso-wrapper.sh -o iso/output/xeno_os-alpha-v_02.0.iso iso/build/
+echo "Generating bootable xeno_os-alpha-v_02.5.iso..."
+sudo grub-mkrescue --xorriso=$(pwd)/xorriso-wrapper.sh -o iso/output/xeno_os-alpha-v_02.5.iso iso/build/
 
 echo "Copying the final bootable ISO directly to Windows C: drive..."
-cp iso/output/xeno_os-alpha-v_02.0.iso "$TARGET_ISO"
+cp iso/output/xeno_os-alpha-v_02.5.iso "$TARGET_ISO"
 
 echo "=== AUTOMATED PIPELINE COMPLETE! ==="
 echo "Your bootable ISO is located at: $TARGET_ISO"

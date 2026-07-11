@@ -1,0 +1,14 @@
+{
+  "name": "desktop-shell",
+  "version": "1.0.0",
+  "description": "Xeno OS Desktop Shell using Astal v2",
+  "main": "app.ts",
+  "type": "module",
+  "dependencies": {
+    "astal": "file:./libs/astal",
+    "@astal/gtk3": "file:./libs/astal-gtk3"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
