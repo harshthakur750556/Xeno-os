@@ -1,3 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from desktop.env import init_qt_environment
+init_qt_environment()
+
 # PySide6 imports
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QPushButton, QStackedWidget, QFrame, QButtonGroup, QApplication)

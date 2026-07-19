@@ -220,6 +220,8 @@ class FileManager(BasePanel):
 
 
 if __name__ == "__main__":
+    from desktop.env import init_qt_environment
+    init_qt_environment()
     app = QApplication(sys.argv)
     w = FileManager()
     w.resize(1000, 600)

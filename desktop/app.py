@@ -3,6 +3,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Configure Qt environment for VMs & standalone runs
+from desktop.env import init_qt_environment
+init_qt_environment()
+
 # PySide6 imports
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QApplication
 from PySide6.QtCore import QThread, Signal, QObject, Qt, QMetaObject, Q_ARG

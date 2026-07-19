@@ -59,7 +59,13 @@ class XenoE2ETestCase(unittest.TestCase):
             payload = {"command": command, "params": params or {}}
             s.sendall(json.dumps(payload).encode('utf-8'))
             s.shutdown(socket.SHUT_WR)
-            resp = s.recv(262144)
+            chunks = []
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            resp = b"".join(chunks)
             s.close()
             return json.loads(resp.decode('utf-8'))
         except Exception as e:

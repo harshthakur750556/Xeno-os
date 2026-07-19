@@ -34,6 +34,9 @@ def main():
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sys.path.insert(0, project_root)
     
+    from desktop.env import init_qt_environment
+    init_qt_environment()
+    
     # Discover and run tests
     loader = unittest.TestLoader()
     suite = loader.discover(start_dir=os.path.dirname(__file__), pattern="test_*.py")

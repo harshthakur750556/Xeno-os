@@ -1,3 +1,9 @@
+```
+ ░█──░█ ░█▀▀▀ ░█▄─░█ ░█▀▀█ ── ░█▀▀█ ░█▀▀▀ 
+ ─░█░█─ ░█▀▀▀ ░█░█░█ ░█──█ ── ░█──█ ░▀▀▀█ 
+ ░█──░█ ░█▄▄▄ ░█──▀█ ░█▄▄█ ── ░█▄▄█ ░█▄▄█ 
+```
+
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  X E N O   O S   C O R E   E N G I N E E R I N G   G U I D E L I N E S       │
 │  [DOC_REF] .cursorrules // [SYSTEM] active // [MODE] cyber-terminal          │
@@ -26,8 +32,8 @@
 │                                                                              │
 │  [RULE_04] AUTONOMOUS REVISION LOGGING                                       │
 │  Whenever you modify any file, write a script, or complete a build,          │
-│  immediately open this file, locate Section 12, and append a detailed        │
-│  chronological briefing using the template provided.                         │
+│  immediately open 'CHANGELOG.md' at project root and append a detailed       │
+│  chronological briefing using the template provided in Section 11.           │
 │                                                                              │
 │  [RULE_05] FILE READ REQUIREMENT                                             │
 │  Before generating any code for this project, you must read this entire      │
@@ -614,19 +620,19 @@
 │ ── 11. REGISTRATION OF WORK LOGS ──────────────────────────────────────────── │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  Whenever you modify, add, or test any file, follow this sequence: open      │
-│  this file, scroll to Section 12, add a horizontal rule followed by your     │
-│  detailed briefing using the template below. Do not modify previous entries. │
+│  Whenever you modify, add, or test any file, open 'CHANGELOG.md' at the root  │
+│  directory, append a horizontal rule followed by your detailed briefing using│
+│  the template below. Do not modify previous entries in 'CHANGELOG.md'.       │
 │                                                                              │
 │  Work Briefing Template:                                                     │
-│  ```                                                                         │
+│  ```markdown                                                                 │
 │  ### [DATE TIME] - Session Briefing                                          │
 │  - Primary Objective: briefly state the goal                                 │
 │  - Changes Made:                                                             │
 │    * [File Path]: detailed changes made                                      │
 │  - Compilation Outcome: passed, warnings, or failed with reason              │
 │  - Tested In: VirtualBox, Hyper-V, or bare metal ThinkPad T480               │
-│  - Diagnostic Findings: what uname -r showed, systemd state, modules loaded  │
+│  - Diagnostic Findings: system state, kernel modules, test status            │
 │  - Next Steps: specific recommendations for next iteration                   │
 │  ```                                                                         │
 │                                                                              │
@@ -636,106 +642,11 @@
 │ ── 12. SYSTEM REVISION HISTORY AND DEVELOPMENT LOG ────────────────────────── │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  ### July 2, 2026 - Session 1 Briefing                                       │
-│  - Primary Objective: Consolidate Phase 1, fix Canonical Signature compile   │
-│    bug, address Hyper-V blank screen, establish automated checkpoint rules.  │
-│  - Changes Made:                                                             │
-│    * .github/workflows/build-kernel.yml: Refactored into compile_kernel and  │
-│      publish_release multi-job workflow. Extended time-outs, added disk space│
-│      cleanup steps, integrated rsync and kmod dependencies.                  │
-│    * scripts/auto-build.sh: Replaced with dynamic workspace path script,     │
-│      using gh CLI API kernel package downloads.                              │
-│    * rootfs/usr/bin/xeno-start-hyprland: Created VM software GPU fallback.   │
-│    * rootfs/etc/systemd/system/xeno-session.service: Re-routed compositor.   │
-│    * iso/build/boot/grub/grub.cfg: Added hostname=xeno-os parameter.         │
-│    * rootfs packages: Added tmux, alsa-utils, micro, fzf.                    │
-│  - Compilation Outcome: Workflow compiled, packages generated without        │
-│    warnings, ISO packaged as xeno_os-alpha-v_02.0.iso.                       │
-│  - Tested In: Microsoft Hyper-V Gen 2 UEFI and VirtualBox VMSVGA + 3D.       │
-│  - Diagnostic Findings: VM boots into live compositor on TTY1 without blank  │
-│    screen. Hostname correctly registers as xeno-os. Hyper-V core             │
-│    communication modules load natively.                                      │
-│  - Next Steps: Awaiting user verification and direct instruction to initiate │
-│    Phase 2.                                                                  │
+│  All chronological session briefings, revision history, and activity logs    │
+│  are maintained in 'CHANGELOG.md' at the repository root.                    │
 │                                                                              │
-│  ### July 6, 2026 - Session 2 Briefing                                       │
-│  - Primary Objective: Decouple design language from hardcoded values.        │
-│  - Changes Made:                                                             │
-│    * .cursorrules Section 1: Added Rule 7 forbidding inline/invented values. │
-│    * .cursorrules Section 3: Added theme files to layout directory.          │
-│    * .cursorrules Section 5: Appended theme imports to Guardrail A and B.    │
-│    * .cursorrules Section 6: Replaced fixed color values with None/undefined │
-│      token schemas in theme.py/theme.ts.                                     │
-│    * .cursorrules Section 7: Updated base_panel.py imports.                  │
-│  - Compilation Outcome: Documentation/rules change only, no code executed.   │
-│  - Next Steps: User defines actual values in desktop/theme.py and            │
-│    desktop/shell/theme.ts before panel or shell compilation.                 │
-│                                                                              │
-│  ### July 6, 2026 - Session 3 Briefing                                       │
-│  - Primary Objective: Implement Phase 2 theme and PySide6 scientific panels. │
-│  - Changes Made:                                                             │
-│    * desktop/theme.py: Initialized visual tokens with Slate-Nord Cyberpunk.  │
-│    * desktop/shell/theme.ts: Created mirroring TypeScript tokens.            │
-│    * desktop/panels/base_panel.py: Placed thread-safe base widgets.          │
-│    * desktop/panels/math_panel.py: Created SymPy LaTeX limit solver.         │
-│    * desktop/panels/data_panel.py: Created Pandas/Plotly analysis tool.      │
-│    * desktop/panels/code_panel.py: Integrated Jupyter console window.        │
-│    * desktop/panels/threed_panel.py: Deferred QVTK interactor mapping.       │
-│    * desktop/panels/signal_panel.py: Built SciPy FFT signal analyzer.        │
-│    * desktop/workspace.py: Added Telemetry thread and stacked widget.        │
-│    * desktop/settings.py: Configured ~/.config/xeno-settings.json writer.    │
-│    * desktop/filemanager.py: Built dual explorer directory previews.         │
-│    * desktop/loginscreen.py: Fixed base layout widget collision.             │
-│    * desktop/app.py: Bootstrapped workspace root path to sys.path.           │
-│  - Compilation Outcome: All modules compile, import, and render successfully.│
-│  - Tested In: Headless import checking and local host graphic window.        │
-│  - Diagnostic Findings: All panels satisfy Guardrails. Fixed layout collision│
-│    preventing login widget rendering. Fixed X11 BadWindow crashes on early   │
-│    VTK widget mapping.                                                       │
-│  - Next Steps: Build the Astal v2 desktop shell widgets on Bun.               │
-│                                                                              │
-│  ### July 10, 2026 - Session 4 Briefing                                      │
-│  - Primary Objective: Defer imports to fix X11 BadWindow startup crashes in  │
-│    app.py, style workspace with Cyberpunk visuals, and wire TS shell.        │
-│  - Changes Made:                                                             │
-│    * desktop/panels/threed_panel.py: Deferred VTK module-level imports.      │
-│    * desktop/panels/base_panel.py, signal_panel.py, math_panel.py: Deferred   │
-│      matplotlib FigureCanvasQTAgg imports.                                   │
-│    * desktop/app.py, workspace.py, loginscreen.py: Cleaned backend imports.  │
-│    * desktop/workspace.py & loginscreen.py: Styled widgets with Neon color.  │
-│    * rootfs/usr/lib/xeno/shell/: Copied TS shell widgets to OS rootfs.       │
-│    * scripts/install-astal-chroot.sh: Created chroot builder.                │
-│    * scripts/auto-build.sh: Replaced gh run download with gh release download.│
-│  - Compilation Outcome: All 72 end-to-end tests passed. PySide6 window       │
-│    launches without crashes. Chroot installer compiles successfully.         │
-│  - Diagnostic Findings: Verified Astal introspection typelibs are correctly  │
-│    installed. Expired artifacts replaced by permanent release downloads.      │
-│  - Next Steps: Verify ISO boot functionality.                                │
-│                                                                              │
-│  ### July 11, 2026 — Session 5 Briefing [SYS_INIT_PATCH]                     │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  X E N O   O S   C O R E   P A C K A G I N G   P I P E L I N E             │  │
-│  │  [DEVICE] DarkPhoenix // [IP] localhost // [PORT] SSH-22                  │  │
-│  │  [LOG_TIME] 2026-07-11T09:03:11Z // SYSTEM REBOOT DIAGNOSTIC              │  │
-│  ├────────────────────────────────────────────────────────────────────────┤  │
-│  │                                                                        │  │
-│  │  [STATUS] Initializing Display Stack Verification...                      │  │
-│  │  [OK]     Display Manager Conflict Resolver Loaded                        │  │
-│  │  [OK]     Wayland Compositor Virtualization Driver Loaded                 │  │
-│  │                                                                        │  │
-│  │  T I M E L I N E   O F   A C T I O N S :                               │  │
-│  │  ────────────────────────────────────────────────────────────────────  │  │
-│  │  [08:50:14] [AUDIT]  Started deep audit of rootfs services.            │  │
-│  │  [08:53:22] [FOUND]  Conflict detected: graphical.target wants GDM3.   │  │
-│  │  [08:54:31] [CLEAN]  Terminated GDM service link to prevent display grab.│  │
-│  │  [08:57:08] [PATCH]  Injected software rendering env vars and safe     │  │
-│  │                      XDG_RUNTIME_DIR setup to xeno-start-hyprland.     │  │
-│  │  [08:57:54] [STORE]  Created 'scripts/fix-boot-display.sh' utility.    │  │
-│  │  [09:00:00] [BUMP]   Upgraded ISO compile target: v2.0 -> v2.5.        │  │
-│  │  [09:03:11] [VERIFY] Display issues resolved under virtual displays!   │  │
-│  │                                                                        │  │
-│  │  PROGRESS: [████████████████████████████████████████████████] 100%     │  │
-│  │                                                                        │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
+│  Link: CHANGELOG.md                                                          │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
+
+

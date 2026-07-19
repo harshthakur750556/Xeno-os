@@ -15,7 +15,13 @@ def send_ipc(command, params=None):
         payload = {"command": command, "params": params or {}}
         s.sendall(json.dumps(payload).encode('utf-8'))
         s.shutdown(socket.SHUT_WR)
-        resp_data = s.recv(262144)
+        chunks = []
+        while True:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        resp_data = b"".join(chunks)
         s.close()
         return json.loads(resp_data.decode('utf-8'))
     except Exception as e:
