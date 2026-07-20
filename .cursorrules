@@ -140,12 +140,10 @@
 │                                                                              │
 │  [RESO_01] UNIVERSAL DRIVER STRATEGY                                         │
 │  The kernel is a full-featured, complete production-grade XanMod kernel (not │
-│  a stripped-down build). It does not use `make x86_64_defconfig`. Instead,   │
-│  it uses the complete Ubuntu Production Baseline config from the GitHub      │
-│  Actions runner at `/boot/config-$(uname -r)`, ensuring 100% hardware,       │
-│  peripheral, and VM compatibility (including vboxguest, vboxvideo,           │
-│  hv_vmbus, hv_storvsc, and hyperv_drm compiled as modules). These modules    │
-│  consume zero RAM unless the specific hypervisor or hardware is detected.    │
+│  a stripped-down build). It uses official XanMod baseline configs merged with│
+│  kernel/configs/xeno.config.fragment (falling back to host Ubuntu config     │
+│  if XanMod baseline is unavailable). This provides full driver support,      │
+│  BORE scheduling, PREEMPT, 1000Hz timer, NTSYNC, and mac80211 injection.    │
 │                                                                              │
 │  [RESO_02] CRYPTOGRAPHIC SIGNATURE BYPASS                                    │
 │  Ubuntu configs enforce Canonical's private signing keys. The build script   │

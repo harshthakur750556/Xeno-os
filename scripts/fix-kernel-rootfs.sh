@@ -103,7 +103,7 @@ if [ "${USE_FALLBACK:-1}" = "0" ]; then
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 cd /tmp/kernel-debs
-dpkg -i linux-image-*.deb linux-headers-*.deb linux-libc-dev*.deb 2>/dev/null \
+dpkg -i linux-image-*.deb linux-headers-*.deb linux-libc-dev*.deb \
     || dpkg -i ./*.deb
 apt-get -f install -y
 
@@ -122,7 +122,7 @@ if find /lib/modules -name '*.dpkg-new' | grep -q .; then
     exit 1
 fi
 
-NEW_VERSION=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | head -1 | sed 's|/boot/vmlinuz-||')
+NEW_VERSION=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | sort -V | tail -1 | sed 's|/boot/vmlinuz-||')
 if [ -z "$NEW_VERSION" ]; then
     echo "ERROR: xeno vmlinuz missing after install"
     exit 1

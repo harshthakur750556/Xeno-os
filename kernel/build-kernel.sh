@@ -57,15 +57,9 @@ apply_patch() {
             echo "  ✓ already applied: $name"
             return 0
         fi
-        # Core mac80211 / cfg80211 patches are hard requirements
-        if [[ "$name" == 0001-* || "$name" == 0002-* ]]; then
-            echo "ERROR: required patch failed: $name"
-            cat /tmp/xeno-patch-dry.log
-            exit 1
-        fi
-        # Legacy driver helpers may not exist on all trees — warn, do not abort
-        echo "WARNING: optional patch skipped (context mismatch): $name"
-        cat /tmp/xeno-patch-dry.log | tail -30
+        echo "ERROR: required patch failed: $name"
+        cat /tmp/xeno-patch-dry.log
+        exit 1
     fi
 }
 

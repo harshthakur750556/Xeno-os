@@ -41,6 +41,13 @@ check_cfg '^CONFIG_WLAN=y'
 check_cfg '^CONFIG_CFG80211=[ym]'
 check_cfg '^CONFIG_MAC80211=[ym]'
 check_cfg '^CONFIG_(ATH9K|IWLWIFI|RTW88|MT76_CORE|BRCMFMAC)=[ym]'
+check_cfg '^CONFIG_PREEMPT(_BUILD|_DYNAMIC|_LAZY)?=[ym]'
+check_cfg '^CONFIG_HZ(_1000=y|=1000)'
+if grep -qE '^CONFIG_NTSYNC=[ym]' "$CFG"; then
+    echo "  ✓ CONFIG_NTSYNC enabled"
+else
+    echo "  · info: CONFIG_NTSYNC not set in kernel config"
+fi
 
 # Modules must not be stuck as dpkg-new inside the package itself
 BAD=$(find "$TMP/lib/modules" -name '*.dpkg-new' 2>/dev/null | wc -l)

@@ -593,5 +593,31 @@ class XenoE2ETestCase(unittest.TestCase):
                 print(violation)
             self.fail(f"Theme conformity audit failed: {len(violations)} violations found in shell files or stylesheets.")
 
+    def test_kernel_build_pipeline_and_security_defaults(self):
+        """Verify kernel build pipeline patch enforcement and security limits configuration."""
+        ws_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        build_script = os.path.join(ws_dir, "kernel", "build-kernel.sh")
+        validate_script = os.path.join(ws_dir, "kernel", "validate-kernel-deb.sh")
+        fix_boot_script = os.path.join(ws_dir, "scripts", "fix-boot-display.sh")
+
+        with open(build_script, "r", encoding="utf-8") as f:
+            build_content = f.read()
+        with open(validate_script, "r", encoding="utf-8") as f:
+            validate_content = f.read()
+        with open(fix_boot_script, "r", encoding="utf-8") as f:
+            fix_boot_content = f.read()
+
+        # All patches must be mandatory (exit 1 on failure)
+        self.assertNotIn("WARNING: optional patch skipped", build_content)
+
+        # Validation must check PREEMPT and HZ=1000
+        self.assertIn("CONFIG_PREEMPT", validate_content)
+        self.assertIn("CONFIG_HZ", validate_content)
+
+        # Boot fix script must scope RT limits to @hyprland and xeno (no wildcard *)
+        self.assertIn("@hyprland soft rtprio 99", fix_boot_content)
+        self.assertIn("xeno soft rtprio 99", fix_boot_content)
+        self.assertNotIn("* soft rtprio", fix_boot_content)
+
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,7 @@ Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kerne
 | Command | Purpose |
 |---|---|
 | `sudo bash scripts/auto-build.sh` | Full ISO packaging pipeline (fetches kernel debs, updates rootfs, builds ZSTD squashfs, generates GRUB ISO Level 3) |
+| `bash scripts/stage-kernel-debs.sh` | Validates and stages locally compiled kernel packages from `kernel/output/` into `kernel/cache/` |
 | `sudo bash scripts/fix-boot-display.sh` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher `/usr/bin/xeno-start-hyprland` |
 | `sudo bash scripts/enter-rootfs.sh` | Interactive chroot into rootfs |
 

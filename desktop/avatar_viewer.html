@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Avatar</title>
+    <style>
+        body { margin: 0; background-color: #2e3440; overflow: hidden; }
+        #state-overlay {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            color: #88c0d0;
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="state-overlay">IDLE</div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#2e3440');
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.5, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const light = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(light);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(2, 2, 2);
+        scene.add(dirLight);
+
+        let avatar = null;
+        let mixer = null;
+        let currentAction = null;
+        const animations = {};
+
+        // Fallback placeholder
+        const geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        const material = new THREE.MeshStandardMaterial({ color: '#88c0d0' });
+        const fallbackMesh = new THREE.Mesh(geometry, material);
+        fallbackMesh.position.y = 0.5;
+        scene.add(fallbackMesh);
+        avatar = fallbackMesh;
+
+        // In a real scenario, we'd load a GLTF model here
+        // const loader = new GLTFLoader();
+        // loader.load('models/avatar.glb', (gltf) => {
+        //     scene.remove(fallbackMesh);
+        //     avatar = gltf.scene;
+        //     scene.add(avatar);
+        //     mixer = new THREE.AnimationMixer(avatar);
+        //     gltf.animations.forEach((clip) => {
+        //         animations[clip.name.toLowerCase()] = mixer.clipAction(clip);
+        //     });
+        //     playAnimation('idle');
+        // });
+
+        function playAnimation(name) {
+            if (!mixer) return;
+            if (currentAction) currentAction.fadeOut(0.2);
+            let action = animations[name];
+            if (!action) action = Object.values(animations)[0]; // fallback to any
+            if (action) {
+                action.reset().fadeIn(0.2).play();
+                currentAction = action;
+            }
+        }
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+            
+            // Fallback animation if no mixer
+            if (!mixer && avatar) {
+                avatar.rotation.y += delta * 0.5;
+                if (window.currentState === 'thinking') avatar.rotation.y += delta * 1.5;
+                if (window.currentState === 'threat') avatar.material.color.setHex(0xbf616a);
+                else avatar.material.color.setHex(0x88c0d0);
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.setAvatarState = function(state) {
+            window.currentState = state;
+            document.getElementById('state-overlay').innerText = state.toUpperCase();
+            playAnimation(state);
+        };
+
+        animate();
+    </script>
+</body>
+</html>

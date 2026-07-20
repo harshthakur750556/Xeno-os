@@ -47,6 +47,13 @@ chown -R "$ACTUAL_USER:$ACTUAL_USER" "$CACHE_DIR" 2>/dev/null || true
 echo "Checking custom kernel backup cache & rollout status..."
 NEED_DOWNLOAD=false
 REMOTE_TAG=""
+
+# First check if fresh local build exists in kernel/output
+if ls "$WS_DIR/kernel/output"/linux-image-*.deb &>/dev/null; then
+    echo "Found local kernel build in kernel/output. Staging..."
+    bash "$WS_DIR/scripts/stage-kernel-debs.sh" || true
+fi
+
 RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
 if [ -n "$RELEASE_INFO" ]; then
     REMOTE_TAG=$(echo "$RELEASE_INFO" | jq -r '.tagName // empty')
@@ -54,7 +61,7 @@ fi
 
 if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && [ -f "$META_FILE" ]; then
     LOCAL_TAG=$(jq -r '.tagName // empty' "$META_FILE" 2>/dev/null || true)
-    if [ -n "$REMOTE_TAG" ] && [ "$REMOTE_TAG" != "$LOCAL_TAG" ]; then
+    if [ -n "$REMOTE_TAG" ] && [ "$REMOTE_TAG" != "$LOCAL_TAG" ] && [[ "$LOCAL_TAG" != local-build-* ]]; then
         echo "[ROLLOUT DETECTED] Remote ($REMOTE_TAG) != local ($LOCAL_TAG). Updating..."
         NEED_DOWNLOAD=true
     else
@@ -67,9 +74,12 @@ fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
     echo "Downloading kernel packages from GitHub Release..."
-    sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber
-    if [ -n "$RELEASE_INFO" ]; then
-        echo "$RELEASE_INFO" > "$META_FILE"
+    if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber 2>/dev/null; then
+        if [ -n "$RELEASE_INFO" ]; then
+            echo "$RELEASE_INFO" > "$META_FILE"
+        fi
+    else
+        echo "WARNING: Failed to download release debs from GitHub. Using local cache if present."
     fi
 fi
 
@@ -123,6 +133,20 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get purge -y live-boot live-boot-initramfs-tools live-tools 2>/dev/null || true
 apt-get autoremove -y 2>/dev/null || true
 apt-get install -y --reinstall casper
+
+# 6.1 ZRAM Setup
+apt-get install -y --no-install-recommends systemd-zram-generator 2>/dev/null || true
+mkdir -p /etc/systemd/zram-generator.conf.d
+cat > /etc/systemd/zram-generator.conf.d/zram0.conf << 'ZRAM_EOF'
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+ZRAM_EOF
+
+# 6.3 Bloat Removal
+apt-get purge -y snapd apport whoopsie cups geoclue-2.0 2>/dev/null || true
+apt-get autoremove -y 2>/dev/null || true
+
 mkdir -p /etc/initramfs-tools
 for m in overlay squashfs zstd; do
     grep -qxF "$m" /etc/initramfs-tools/modules 2>/dev/null || echo "$m" >> /etc/initramfs-tools/modules
@@ -131,7 +155,7 @@ done
 # Select boot kernel: prefer validated xeno, else generic
 if ls /boot/vmlinuz-*xeno* >/dev/null 2>&1; then
     # Ignore dpkg-new leftovers
-    KIMG=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | grep -v dpkg-new | head -1 || true)
+    KIMG=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
 else
     KIMG=""
 fi
@@ -209,6 +233,14 @@ if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
     if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
         echo "Installing security/wireless tools into rootfs..."
         bash "$WS_DIR/scripts/setup-security-tools.sh" || echo "WARNING: security tools setup had errors"
+    fi
+    if [ ! -x "$ROOTFS/usr/bin/xeno-ai-engine" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        echo "Installing AI Engine into rootfs..."
+        bash "$WS_DIR/scripts/setup-ai.sh" || echo "WARNING: AI Engine setup had errors"
+    fi
+    if [ -x "$WS_DIR/drivers/install-oot-wifi.sh" ]; then
+        echo "Installing OOT WiFi drivers into rootfs..."
+        XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh" || echo "WARNING: OOT WiFi drivers setup had errors"
     fi
 fi
 

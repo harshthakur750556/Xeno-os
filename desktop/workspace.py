@@ -28,6 +28,7 @@ from desktop.panels.data_panel import DataPanel
 from desktop.panels.code_panel import CodePanel
 from desktop.panels.threed_panel import ThreeDPanel
 from desktop.panels.signal_panel import SignalPanel
+from desktop.avatar_controller import AvatarController
 
 
 class SysMonitorWorker(QObject):
@@ -278,6 +279,35 @@ class XenoWorkspace(QWidget):
         self.socket_status.setStyleSheet(f"color: {theme.accent_2}; font-family: '{theme.font_mono}'; font-size: {theme.size_xs}px; padding: {theme.space_sm}px; letter-spacing: 1px; background: transparent;")
         sidebar_layout.addWidget(self.socket_status)
 
+        # 3D Avatar Area
+        self.avatar_controller = AvatarController(self)
+        
+        # Attempt to load WebEngine for 3D Three.js Avatar Viewport
+        try:
+            from PySide6.QtWebEngineWidgets import QWebEngineView
+            from PySide6.QtCore import QUrl
+            
+            self.avatar_display = QWebEngineView()
+            self.avatar_display.setFixedHeight(250)
+            self.avatar_display.setStyleSheet(f"background: {theme.surface_2}; border: 1px solid {theme.border}; border-radius: {theme.radius_sm}px;")
+            
+            html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "avatar_viewer.html"))
+            self.avatar_display.setUrl(QUrl.fromLocalFile(html_path))
+            
+            self.avatar_controller.state_changed.connect(
+                lambda s: self.avatar_display.page().runJavaScript(f"if(window.setAvatarState) window.setAvatarState('{s}');")
+            )
+        except ImportError:
+            # Fallback to QLabel if QtWebEngine is not installed
+            self.avatar_display = QLabel("[ 3D AVATAR MODEL: IDLE ]")
+            self.avatar_display.setAlignment(Qt.AlignCenter)
+            self.avatar_display.setStyleSheet(f"color: {theme.accent}; background: {theme.surface_2}; border: 1px solid {theme.border}; border-radius: {theme.radius_sm}px; padding: {theme.space_lg}px; font-family: '{theme.font_mono}'; font-weight: bold;")
+            self.avatar_controller.state_changed.connect(
+                lambda s: self.avatar_display.setText(f"[ 3D AVATAR MODEL: {s.upper()} ]")
+            )
+
+        sidebar_layout.addWidget(self.avatar_display)
+
         # 3. Content Panel (Topbar + Stack)
         self.content_widget = QWidget()
         content_layout = QVBoxLayout(self.content_widget)
@@ -310,17 +340,12 @@ class XenoWorkspace(QWidget):
         # 5. Core Panels Stack Widget
         self.stacked_widget = QStackedWidget()
         
-        self.panel_math = MathPanel()
-        self.panel_data = DataPanel()
-        self.panel_code = CodePanel()
-        self.panel_3d = ThreeDPanel()
-        self.panel_sig = SignalPanel()
-
-        self.stacked_widget.addWidget(self.panel_math)
-        self.stacked_widget.addWidget(self.panel_data)
-        self.stacked_widget.addWidget(self.panel_code)
-        self.stacked_widget.addWidget(self.panel_3d)
-        self.stacked_widget.addWidget(self.panel_sig)
+        self._panel_classes = [MathPanel, DataPanel, CodePanel, ThreeDPanel, SignalPanel]
+        self._panels = [None] * len(self._panel_classes)
+        
+        # Add placeholders
+        for _ in self._panel_classes:
+            self.stacked_widget.addWidget(QWidget())
 
         content_layout.addWidget(self.stacked_widget)
 
@@ -336,6 +361,15 @@ class XenoWorkspace(QWidget):
         self.on_nav_clicked(0)
 
     def on_nav_clicked(self, panel_idx):
+        if self._panels[panel_idx] is None:
+            # Lazy load panel to reduce RAM usage
+            panel = self._panel_classes[panel_idx]()
+            self._panels[panel_idx] = panel
+            old_widget = self.stacked_widget.widget(panel_idx)
+            self.stacked_widget.insertWidget(panel_idx, panel)
+            self.stacked_widget.removeWidget(old_widget)
+            old_widget.deleteLater()
+            
         self.stacked_widget.setCurrentIndex(panel_idx)
         titles = ["▸ MATH SOLVER WORKSPACE", "▸ DATA ANALYSIS SUITE", "▸ JUPYTER INTERACTIVE KERNEL", "▸ VTK 3D RENDER ENGINE", "▸ DSP SIGNAL ANALYZER"]
         self.active_title.setText(titles[panel_idx])

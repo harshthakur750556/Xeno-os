@@ -48,6 +48,7 @@ export const sandboxMemoryLimit = new Variable<string>("2GB");
 export const sandboxThreads = new Variable<number>(2);
 export const sandboxPanels = new Variable<string[]>([]);
 export const displaySocketExists = new Variable<boolean>(true);
+export const avatarState = new Variable<string>("idle"); // idle | active | thinking | threat
 
 // Overrides
 let clockOverridden = false;
@@ -409,7 +410,37 @@ export function handleIPCRequest(request: any): any {
       }
       sandboxPanels.set([...sandboxPanels.get(), panel]);
       return { status: "success", panels: sandboxPanels.get() };
-      
+
+    // F5: AI & Agent APIs
+    case "ai:prompt":
+      const promptText = params.prompt;
+      notificationLogs.set([...notificationLogs.get(), `AI PROMPT: ${promptText}`]);
+      return { status: "success", message: "Prompt received" };
+
+    case "ai:get_telemetry":
+      return {
+        status: "success",
+        cpu: cpuUsage.get(),
+        ram: ramUsage.get(),
+        clock: clockTime.get()
+      };
+
+    case "ai:switch_workspace":
+      const wsId = params.workspace_id;
+      workspacesList.set(workspacesList.get().map((w: any) => ({ ...w, active: w.id === wsId })));
+      return { status: "success", active_workspace: wsId };
+
+    case "ai:execute_tool":
+      const toolName = params.tool;
+      const toolArgs = params.args;
+      notificationLogs.set([...notificationLogs.get(), `AI EXECUTING: ${toolName} with ${JSON.stringify(toolArgs)}`]);
+      return { status: "success", message: `Tool ${toolName} queued` };
+
+    case "ai:set_avatar_state":
+      const state = params.state || "idle";
+      avatarState.set(state);
+      return { status: "success", avatar_state: state };
+
     default:
       return { status: "error", message: `Unknown IPC command: ${cmd}` };
   }

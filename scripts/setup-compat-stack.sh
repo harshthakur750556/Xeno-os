@@ -52,6 +52,9 @@ apt-get install -y --no-install-recommends \
     vulkan-tools \
     mesa-vulkan-drivers \
     mesa-vulkan-drivers:i386 \
+    pocl-opencl-icd \
+    intel-opencl-icd \
+    clinfo \
     libgl1-mesa-dri \
     libgl1-mesa-dri:i386 \
     libasound2t64 \

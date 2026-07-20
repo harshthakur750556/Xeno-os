@@ -31,6 +31,30 @@ class BaseWorker(QObject):
         )
 
 
+class XenoParallelWorker(BaseWorker):
+    """
+    Background worker leveraging concurrent.futures for multi-core scaling.
+    """
+    def __init__(self):
+        super().__init__()
+        import multiprocessing
+        from concurrent.futures import ProcessPoolExecutor
+        # Reserve 1 core for GUI if possible
+        cores = max(1, multiprocessing.cpu_count() - 1)
+        self.executor = ProcessPoolExecutor(max_workers=cores)
+
+    def compute(self, func, *args, **kwargs):
+        try:
+            future = self.executor.submit(func, *args, **kwargs)
+            res = future.result()
+            self.result_ready.emit(res)
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+            
+    def shutdown(self):
+        self.executor.shutdown(wait=False)
+
+
 class BasePanel(QWidget):
     """
     Base class for all Xeno OS scientific panels.

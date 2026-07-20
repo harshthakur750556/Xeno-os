@@ -51,6 +51,52 @@ xeno soft memlock unlimited
 xeno hard memlock unlimited
 LIMITS_EOF
 
+# ── 2.5 Hardware Auto-Detection ──────────────────────────────
+echo "[2.5/4] Writing xeno-hardware-detect..."
+cat > "$ROOTFS/usr/bin/xeno-hardware-detect" << 'HW_EOF'
+#!/bin/bash
+# Scan lspci and DRM nodes to set optimal hardware variables
+if command -v lspci >/dev/null; then
+    if lspci | grep -qi nvidia; then
+        export LIBVA_DRIVER_NAME=nvidia
+        export GBM_BACKEND=nvidia-drm
+        export __GLX_VENDOR_LIBRARY_NAME=nvidia
+        export WLR_NO_HARDWARE_CURSORS=1
+    elif lspci | grep -qi amd; then
+        export LIBVA_DRIVER_NAME=radeonsi
+    elif lspci | grep -qi intel; then
+        export LIBVA_DRIVER_NAME=iHD
+    fi
+fi
+HW_EOF
+chmod +x "$ROOTFS/usr/bin/xeno-hardware-detect"
+
+# ── 2.6 Automatic Power & CPU Topology Optimizer ─────────────
+echo "[2.6/4] Setting up xeno-autotune.service..."
+cat > "$ROOTFS/usr/bin/xeno-autotune" << 'AUTOTUNE_EOF'
+#!/bin/bash
+if [ "$(cat /sys/class/power_supply/AC/online 2>/dev/null)" = "1" ] || [ "$(cat /sys/class/power_supply/ACAD/online 2>/dev/null)" = "1" ]; then
+    echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
+else
+    echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
+fi
+AUTOTUNE_EOF
+chmod +x "$ROOTFS/usr/bin/xeno-autotune"
+cat > "$ROOTFS/etc/systemd/system/xeno-autotune.service" << 'AUTOSVC_EOF'
+[Unit]
+Description=Xeno OS Power and CPU Autotune
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/xeno-autotune
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+AUTOSVC_EOF
+ln -sf /etc/systemd/system/xeno-autotune.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/xeno-autotune.service" || true
+
 # ── 3. Hyprland launcher ─────────────────────────────────────
 echo "[3/4] Writing updated xeno-start-hyprland..."
 cat > "$ROOTFS/usr/bin/xeno-start-hyprland" << 'LAUNCHER_EOF'
@@ -99,6 +145,9 @@ else
             unset LIBGL_ALWAYS_SOFTWARE || true
             unset MESA_LOADER_DRIVER_OVERRIDE || true
             unset GALLIUM_DRIVER || true
+            if [ -x /usr/bin/xeno-hardware-detect ]; then
+                source /usr/bin/xeno-hardware-detect
+            fi
             export WLR_NO_HARDWARE_CURSORS="${WLR_NO_HARDWARE_CURSORS:-0}"
             ;;
     esac

@@ -13,6 +13,7 @@ set -euo pipefail
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOTFS="${XENO_ROOTFS:-$WS_DIR/rootfs}"
 ENABLE_KALI_REPO="${ENABLE_KALI_REPO:-1}"
+XENO_SECURITY_PROFILE="${XENO_SECURITY_PROFILE:-minimal}"
 # shellcheck source=/dev/null
 source "$WS_DIR/scripts/lib-chroot.sh"
 
@@ -57,6 +58,8 @@ fi
 chroot "$ROOTFS" /bin/bash << 'CHROOT_EOF'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
+export XENO_SECURITY_PROFILE="$XENO_SECURITY_PROFILE"
+
 
 echo "[1/6] apt update..."
 apt-get update || true
@@ -148,6 +151,13 @@ done
 echo "[4/6] Optional Kali-only packages (pinned, explicit)..."
 if [ -f /etc/apt/sources.list.d/kali-rolling.list ]; then
     apt-get update || true
+    
+    if [ "$XENO_SECURITY_PROFILE" = "wireless" ]; then
+        apt-get install -y -t kali-rolling --no-install-recommends kali-tools-wireless || true
+    elif [ "$XENO_SECURITY_PROFILE" = "full" ]; then
+        apt-get install -y -t kali-rolling --no-install-recommends kali-linux-default kali-tools-wireless kali-tools-top10 kali-tools-web kali-tools-information-gathering || true
+    fi
+
     # Only pull tools that are weak/missing on Ubuntu; never pull libc/base
     KALI_ONLY=(wifite airgeddon responder bloodhound)
     for p in "${KALI_ONLY[@]}"; do
@@ -272,6 +282,59 @@ chmod 755 /usr/bin/xeno-wifi-monitor
 
 apt-get clean
 echo "Security/wireless tooling installed."
+
+# 1.3 MAC Randomization
+mkdir -p /etc/NetworkManager/conf.d/
+cat > /etc/NetworkManager/conf.d/00-macrandomize.conf << 'MAC_EOF'
+[device]
+wifi.scan-rand-mac-address=yes
+
+[connection]
+wifi.cloned-mac-address=random
+ethernet.cloned-mac-address=random
+MAC_EOF
+
+# 1.3 Transparent Tor proxy toggle helper (kalitorify alternative)
+cat > /usr/bin/xeno-tor-proxy << 'TOR_EOF'
+#!/bin/bash
+set -euo pipefail
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run as root: sudo $0 {start|stop|status}"
+    exit 1
+fi
+CMD="${1:-status}"
+case "$CMD" in
+    start)
+        systemctl start tor
+        iptables -t nat -A OUTPUT -m owner --uid-owner debian-tor -j RETURN
+        iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5353
+        iptables -t nat -A OUTPUT -p tcp --syn -j REDIRECT --to-ports 9040
+        echo "Transparent Tor proxy enabled."
+        ;;
+    stop)
+        iptables -t nat -F OUTPUT
+        echo "Transparent Tor proxy disabled."
+        ;;
+    status)
+        iptables -t nat -L OUTPUT -n -v
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status}"
+        exit 1
+        ;;
+esac
+TOR_EOF
+chmod 755 /usr/bin/xeno-tor-proxy
+
+# 1.4 Posture Management
+if [ "$XENO_SECURITY_PROFILE" = "hardened" ]; then
+    echo "Applying hardened security posture..."
+    echo "xeno ALL=(ALL:ALL) ALL" > /etc/sudoers.d/xeno
+else
+    echo "Applying live-lab security posture..."
+    echo "xeno ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/xeno
+fi
+
 CHROOT_EOF
 
 echo "✓ Security tools ready in rootfs"

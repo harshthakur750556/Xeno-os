@@ -246,6 +246,12 @@ class ThreeDPanel(BasePanel):
 
         self.renderer.RemoveAllViewProps()
 
+        # 2.2 Adaptive mesh resolution based on hardware capabilities
+        is_software = os.environ.get("LIBGL_ALWAYS_SOFTWARE") == "1"
+        if is_software and "res" in params:
+            # Force lower resolution to avoid locking up software pixman thread
+            params["res"] = max(3, params["res"] // 2)
+
         # Map shape type to VTK Source
         if shape_type == "Sphere":
             source = vtk.vtkSphereSource()
@@ -274,7 +280,14 @@ class ThreeDPanel(BasePanel):
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInputConnection(source.GetOutputPort())
 
-        actor = vtk.vtkActor()
+        # Use LOD Actor for software rendering to keep UI responsive
+        if is_software:
+            actor = vtk.vtkLODActor()
+            actor.SetNumberOfCloudPoints(500)
+            actor.GetProperty().SetInterpolationToFlat()
+        else:
+            actor = vtk.vtkActor()
+            
         actor.SetMapper(mapper)
 
         # Style mesh with accent color
