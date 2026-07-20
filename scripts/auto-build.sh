@@ -1,46 +1,52 @@
 #!/bin/bash
-set -e
+# ═══════════════════════════════════════════════════════════════
+# Xeno OS — Full ISO packaging pipeline
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
 
-REPO="YOURGITHUBUSERNAME/xeno-os" # The script will automatically detect this from git, but falls back here
-WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
+WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_ISO="/mnt/c/Users/harsh/xeno_os-3.0-alpha.iso"
 if [ ! -d "/mnt/c/Users/harsh" ]; then
     TARGET_ISO="$WS_DIR/iso/output/xeno_os-3.0-alpha.iso"
 fi
+ROOTFS="$WS_DIR/rootfs"
+CACHE_DIR="$WS_DIR/kernel/cache"
+META_FILE="$CACHE_DIR/latest_release.json"
+# shellcheck source=/dev/null
+source "$WS_DIR/scripts/lib-chroot.sh"
 
 cd "$WS_DIR"
 
-# Run boot display fix to ensure rootfs is configured correctly
-echo "Applying boot display fixes..."
-sudo bash scripts/fix-boot-display.sh
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: run as root: sudo bash scripts/auto-build.sh"
+    exit 1
+fi
 
 echo "=== Xeno OS Automated Packaging Pipeline ==="
+echo "Workspace: $WS_DIR"
 
-# 1. Verify GitHub CLI auth
+# ── 0. Boot display / session fixes ──────────────────────────
+echo "Applying boot display fixes..."
+bash "$WS_DIR/scripts/fix-boot-display.sh"
+
+# ── 1. GitHub auth (for kernel release download) ─────────────
 ACTUAL_USER="${SUDO_USER:-xeno}"
 if ! sudo -u "$ACTUAL_USER" gh auth status &>/dev/null && ! gh auth status &>/dev/null; then
     echo "ERROR: GitHub CLI is not authenticated. Run 'gh auth login' first."
     exit 1
 fi
 
-# Detect repository name dynamically
-DETECTED_REPO=$(git config --get remote.origin.url | sed -E 's/.*github.com[:\/](.*)\.git/\1/')
-if [ -n "$DETECTED_REPO" ]; then
-    REPO="$DETECTED_REPO"
-fi
+DETECTED_REPO=$(git config --get remote.origin.url | sed -E 's#.*github.com[:/](.+)(\.git)?$#\1#' | sed 's/\.git$//')
+REPO="${DETECTED_REPO:-YOURGITHUBUSERNAME/xeno-os}"
 echo "Targeting Repository: $REPO"
 
-# 2. Smart Kernel Backup Cache & Automated Monthly Rollout Check
-CACHE_DIR="$WS_DIR/kernel/cache"
-META_FILE="$CACHE_DIR/latest_release.json"
-mkdir -p "$CACHE_DIR"
-chown -R "$ACTUAL_USER:$ACTUAL_USER" "$CACHE_DIR"
+# ── 2. Kernel cache / release fetch ──────────────────────────
+mkdir -p "$CACHE_DIR" "$WS_DIR/iso/output"
+chown -R "$ACTUAL_USER:$ACTUAL_USER" "$CACHE_DIR" 2>/dev/null || true
 
 echo "Checking custom kernel backup cache & rollout status..."
-
 NEED_DOWNLOAD=false
 REMOTE_TAG=""
-
 RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
 if [ -n "$RELEASE_INFO" ]; then
     REMOTE_TAG=$(echo "$RELEASE_INFO" | jq -r '.tagName // empty')
@@ -48,15 +54,14 @@ fi
 
 if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && [ -f "$META_FILE" ]; then
     LOCAL_TAG=$(jq -r '.tagName // empty' "$META_FILE" 2>/dev/null || true)
-    
     if [ -n "$REMOTE_TAG" ] && [ "$REMOTE_TAG" != "$LOCAL_TAG" ]; then
-        echo "[ROLLOUT DETECTED] Remote release ($REMOTE_TAG) differs from local cache ($LOCAL_TAG). Updating backup cache..."
+        echo "[ROLLOUT DETECTED] Remote ($REMOTE_TAG) != local ($LOCAL_TAG). Updating..."
         NEED_DOWNLOAD=true
     else
-        echo "[KERNEL CACHE VALID] Local backup ($LOCAL_TAG) is up-to-date with latest release ($REMOTE_TAG). Bypassing download."
+        echo "[KERNEL CACHE] Local backup tag=$LOCAL_TAG remote=$REMOTE_TAG"
     fi
 else
-    echo "[INITIAL DOWNLOAD] No valid kernel backup found in kernel/cache/. Fetching latest release..."
+    echo "[INITIAL DOWNLOAD] Fetching latest kernel release..."
     NEED_DOWNLOAD=true
 fi
 
@@ -68,101 +73,175 @@ if [ "$NEED_DOWNLOAD" = true ]; then
     fi
 fi
 
-# Stage packages for rootfs chroot installation
-sudo rm -rf rootfs/tmp/kernel-debs
-sudo mkdir -p rootfs/tmp/kernel-debs
-sudo cp "$CACHE_DIR"/*.deb rootfs/tmp/kernel-debs/
-
-# Verify debs exist
-if ! ls rootfs/tmp/kernel-debs/linux-image-*.deb &>/dev/null; then
-    echo "ERROR: Downloaded kernel artifacts are empty or corrupted."
+if ! ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null; then
+    echo "ERROR: no linux-image-*.deb in $CACHE_DIR"
     exit 1
 fi
 
-# 4. Bind system partitions and enter chroot to install the packages
-echo "Mounting rootfs partitions and performing chroot installation..."
-sudo mount --bind /proc rootfs/proc 2>/dev/null || true
-sudo mount --bind /sys rootfs/sys 2>/dev/null || true
-sudo mount --bind /dev rootfs/dev 2>/dev/null || true
-sudo mount --bind /dev/pts rootfs/dev/pts 2>/dev/null || true
+# ── 3. Validate kernel debs (show-stopper gate) ──────────────
+KERNEL_VALID=0
+if bash "$WS_DIR/kernel/validate-kernel-deb.sh" "$CACHE_DIR"; then
+    KERNEL_VALID=1
+    echo "✓ Kernel debs passed WLAN/module validation"
+else
+    echo ""
+    echo "════════════════════════════════════════════════════"
+    echo "  FATAL: kernel debs failed validation."
+    echo "  Refusing to ship a Wi-Fi-broken custom kernel."
+    echo ""
+    echo "  Fix: rebuild kernel via CI (patches + WLAN fragment):"
+    echo "    gh workflow run build-kernel.yml"
+    echo "  Or wait for schedule / push under kernel/**"
+    echo "════════════════════════════════════════════════════"
+    # Fall back ONLY if Ubuntu generic is present so ISO still boots
+    if ! ls "$ROOTFS"/boot/vmlinuz-*-generic &>/dev/null; then
+        echo "ERROR: no generic fallback kernel either. Aborting."
+        exit 1
+    fi
+    echo "Continuing with Ubuntu generic kernel fallback for this ISO build."
+    KERNEL_VALID=0
+fi
 
-sudo chroot rootfs /bin/bash << 'EOF'
-# Force remove conflicting live-boot packages
-apt-get purge -y live-boot live-boot-initramfs-tools live-tools
-apt-get autoremove -y
+# ── 4. Repair / install kernel into rootfs ───────────────────
+if [ "$KERNEL_VALID" = "1" ]; then
+    # Use validated debs
+    bash "$WS_DIR/scripts/fix-kernel-rootfs.sh"
+else
+    # Purge broken custom kernels; keep generic
+    XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/fix-kernel-rootfs.sh" || true
+fi
 
-# Reinstall stable Casper system
+# ── 5. Casper / initramfs essentials ─────────────────────────
+echo "Mounting rootfs and ensuring casper live stack..."
+xeno_chroot_mount "$ROOTFS"
+cleanup_mounts() { xeno_chroot_umount "$ROOTFS"; }
+trap cleanup_mounts EXIT
+
+chroot "$ROOTFS" /bin/bash << 'EOF'
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get purge -y live-boot live-boot-initramfs-tools live-tools 2>/dev/null || true
+apt-get autoremove -y 2>/dev/null || true
 apt-get install -y --reinstall casper
+mkdir -p /etc/initramfs-tools
+for m in overlay squashfs zstd; do
+    grep -qxF "$m" /etc/initramfs-tools/modules 2>/dev/null || echo "$m" >> /etc/initramfs-tools/modules
+done
 
-# Force essential modules into target initramfs
-echo "overlay" >> /etc/initramfs-tools/modules
-echo "squashfs" >> /etc/initramfs-tools/modules
-echo "zstd" >> /etc/initramfs-tools/modules
-
-# Purge any older kernel versions
-dpkg --purge $(dpkg -l | grep -E "linux-image|linux-headers" | grep xeno | awk '{print $2}') 2>/dev/null || true
-
-# Install the new Universal Kernel packages downloaded from the API
-cd /tmp/kernel-debs
-dpkg -i *.deb || apt-get install -f -y
-
-# Generate target ramdisk
-NEW_VERSION=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | head -1 | sed 's|/boot/vmlinuz-||')
-if [ -z "$NEW_VERSION" ]; then
-    echo "ERROR: Kernel vmlinuz image not found in /boot!"
+# Select boot kernel: prefer validated xeno, else generic
+if ls /boot/vmlinuz-*xeno* >/dev/null 2>&1; then
+    # Ignore dpkg-new leftovers
+    KIMG=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | grep -v dpkg-new | head -1 || true)
+else
+    KIMG=""
+fi
+if [ -z "$KIMG" ]; then
+    KIMG=$(ls /boot/vmlinuz-*-generic 2>/dev/null | sort -V | tail -1)
+fi
+if [ -z "$KIMG" ]; then
+    echo "ERROR: no bootable vmlinuz found"
     exit 1
 fi
-update-initramfs -c -k "$NEW_VERSION" || update-initramfs -u -k "$NEW_VERSION"
+NEW_VERSION="${KIMG#/boot/vmlinuz-}"
+echo "Boot kernel version: $NEW_VERSION"
+if [ ! -f "/boot/initrd.img-$NEW_VERSION" ]; then
+    update-initramfs -c -k "$NEW_VERSION" || update-initramfs -u -k "$NEW_VERSION"
+fi
+# Reject broken package state
+bad=$(dpkg -l | awk '$1 ~ /U|H|R|F/ {print $2}')
+if [ -n "$bad" ]; then
+    echo "ERROR: broken packages remain:"
+    echo "$bad"
+    exit 1
+fi
+# Reject dpkg-new modules
+if find /lib/modules -name '*.dpkg-new' 2>/dev/null | grep -q .; then
+    echo "ERROR: *.dpkg-new modules present — kernel install incomplete"
+    exit 1
+fi
 apt-get clean
+# Export for outer script via file
+echo "$NEW_VERSION" > /tmp/xeno-boot-kver
 EOF
 
-sudo umount -l rootfs/dev/pts 2>/dev/null || true
-sudo umount -l rootfs/dev 2>/dev/null || true
-sudo umount -l rootfs/proc 2>/dev/null || true
-sudo umount -l rootfs/sys 2>/dev/null || true
+KVER=$(cat "$ROOTFS/tmp/xeno-boot-kver")
+echo "Using kernel: $KVER"
 
-# 5. Clean staging and copy boot files
+# ── 6. Assemble casper boot files ────────────────────────────
 echo "Assembling bootloader files..."
-sudo rm -rf iso/build/*
-mkdir -p iso/build/casper
-mkdir -p iso/build/boot/grub/i386-pc
+rm -rf "$WS_DIR/iso/build"/*
+mkdir -p "$WS_DIR/iso/build/casper" "$WS_DIR/iso/build/boot/grub/i386-pc"
 
-KERNEL=$(ls rootfs/boot/vmlinuz-*xeno* | head -1)
-INITRD=$(ls rootfs/boot/initrd.img-*xeno* | head -1)
-sudo cp "$KERNEL" iso/build/casper/vmlinuz
-sudo cp "$INITRD" iso/build/casper/initrd
+KERNEL_SRC="$ROOTFS/boot/vmlinuz-$KVER"
+INITRD_SRC="$ROOTFS/boot/initrd.img-$KVER"
+if [ ! -f "$KERNEL_SRC" ] || [ ! -f "$INITRD_SRC" ]; then
+    echo "ERROR: missing $KERNEL_SRC or $INITRD_SRC"
+    exit 1
+fi
+cp "$KERNEL_SRC" "$WS_DIR/iso/build/casper/vmlinuz"
+cp "$INITRD_SRC" "$WS_DIR/iso/build/casper/initrd"
 
-# 6. Generate GRUB configuration
-cat > iso/build/boot/grub/grub.cfg << 'EOF'
+cat > "$WS_DIR/iso/build/boot/grub/grub.cfg" << 'EOF'
 set timeout=5
 set default=0
 menuentry "Xeno OS Live (Wayland - Universal)" {
     linux /casper/vmlinuz boot=casper quiet splash username=xeno hostname=xeno-os ---
     initrd /casper/initrd
 }
+menuentry "Xeno OS Live (Safe graphics)" {
+    linux /casper/vmlinuz boot=casper quiet splash username=xeno hostname=xeno-os xeno.safegraphics=1 ---
+    initrd /casper/initrd
+}
 EOF
 
-# 6b. Sync updated desktop environment and tests into rootfs
-echo "Syncing updated desktop environment and tests into rootfs..."
-sudo rsync -a --delete "$WS_DIR/desktop/" "$WS_DIR/rootfs/home/xeno/desktop/"
-sudo rsync -a --delete "$WS_DIR/tests/" "$WS_DIR/rootfs/home/xeno/tests/"
-sudo chown -R 1000:1000 "$WS_DIR/rootfs/home/xeno/desktop" "$WS_DIR/rootfs/home/xeno/tests"
+# ── 7. Sync desktop + install feature stacks if missing ──────
+echo "Syncing desktop environment and tests into rootfs..."
+rsync -a --delete "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
+rsync -a --delete "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
+chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/tests" 2>/dev/null || true
 
-# 7. Compress the root filesystem
+# Ensure Windows + security tools present (idempotent)
+if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
+    if [ ! -x "$ROOTFS/usr/bin/xeno-windows" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        echo "Installing Windows compatibility stack into rootfs..."
+        bash "$WS_DIR/scripts/setup-compat-stack.sh" || echo "WARNING: compat stack setup had errors"
+    fi
+    if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        echo "Installing security/wireless tools into rootfs..."
+        bash "$WS_DIR/scripts/setup-security-tools.sh" || echo "WARNING: security tools setup had errors"
+    fi
+fi
+
+# Re-assert no broken packages after feature setup
+xeno_assert_no_broken_pkgs "$ROOTFS"
+
+# ── 8. SquashFS ──────────────────────────────────────────────
 echo "Compressing root filesystem into SquashFS (ZSTD L6)..."
-sudo rm -f iso/build/casper/filesystem.squashfs
-sudo mksquashfs rootfs iso/build/casper/filesystem.squashfs -comp zstd -Xcompression-level 6 -noappend -e rootfs/proc -e rootfs/sys -e rootfs/dev -e rootfs/tmp
+rm -f "$WS_DIR/iso/build/casper/filesystem.squashfs"
+mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
+    -comp zstd -Xcompression-level 6 -noappend \
+    -e "$ROOTFS/proc" -e "$ROOTFS/sys" -e "$ROOTFS/dev" -e "$ROOTFS/tmp" \
+    -e "$ROOTFS/run" -e "$ROOTFS/var/cache/apt/archives"
 
-# 8. Compile El Torito Boot Record
-sudo cp -r /usr/lib/grub/i386-pc/* iso/build/boot/grub/i386-pc/ 2>/dev/null || true
-grub-mkimage -O i386-pc -o iso/build/boot/grub/i386-pc/eltorito.img -p '(cd0)/boot/grub' iso9660 biosdisk normal
+# ── 9. GRUB ISO (Level 3 via wrapper) ────────────────────────
+cp -r /usr/lib/grub/i386-pc/* "$WS_DIR/iso/build/boot/grub/i386-pc/" 2>/dev/null || true
+grub-mkimage -O i386-pc -o "$WS_DIR/iso/build/boot/grub/i386-pc/eltorito.img" \
+    -p '(cd0)/boot/grub' iso9660 biosdisk normal
 
-# 9. Create final ISO and copy to Windows Desktop
-echo "Generating bootable xeno_os-3.0-alpha.iso..."
-sudo grub-mkrescue --xorriso=$(pwd)/xorriso-wrapper.sh -o iso/output/xeno_os-3.0-alpha.iso iso/build/
+echo "Generating bootable ISO..."
+mkdir -p "$WS_DIR/iso/output"
+grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
+    -o "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$WS_DIR/iso/build/"
 
-echo "Copying the final bootable ISO directly to Windows C: drive..."
-cp iso/output/xeno_os-3.0-alpha.iso "$TARGET_ISO" 2>/dev/null || true
+cp "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$TARGET_ISO" 2>/dev/null || true
 
-echo "=== AUTOMATED PIPELINE COMPLETE! ==="
-echo "Your bootable ISO is located at: $TARGET_ISO"
+trap - EXIT
+xeno_chroot_umount "$ROOTFS"
+
+echo "=== AUTOMATED PIPELINE COMPLETE ==="
+echo "ISO: $TARGET_ISO"
+echo "Boot kernel: $KVER"
+if [ "$KERNEL_VALID" != "1" ]; then
+    echo "NOTE: Custom Xeno kernel was INVALID — ISO used fallback generic kernel."
+    echo "      Rebuild kernel CI to restore XanMod + injection + full WLAN."
+fi

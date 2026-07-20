@@ -1,12 +1,19 @@
 #!/bin/bash
-sudo mount --bind /proc rootfs/proc
-sudo mount --bind /sys rootfs/sys
-sudo mount --bind /dev rootfs/dev
-sudo mount --bind /dev/pts rootfs/dev/pts
-sudo cp /etc/resolv.conf rootfs/etc/resolv.conf
-sudo chroot rootfs /bin/bash
-sudo umount rootfs/proc
-sudo umount rootfs/sys
-sudo umount rootfs/dev/pts
-sudo umount rootfs/dev
+set -euo pipefail
+WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOTFS="$WS_DIR/rootfs"
+# shellcheck source=/dev/null
+source "$WS_DIR/scripts/lib-chroot.sh"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: run as root: sudo bash scripts/enter-rootfs.sh"
+    exit 1
+fi
+
+xeno_chroot_mount "$ROOTFS"
+cleanup() { xeno_chroot_umount "$ROOTFS"; }
+trap cleanup EXIT
+
+echo "Entering Xeno OS rootfs at $ROOTFS"
+chroot "$ROOTFS" /bin/bash
 echo "Exited Xeno OS rootfs"

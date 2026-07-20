@@ -1,0 +1,16 @@
+--- a/net/wireless/chan.c
++++ b/net/wireless/chan.c
+@@ -1510,8 +1510,11 @@ int cfg80211_set_monitor_channel(struct
+ {
+ 	if (!rdev->ops->set_monitor_channel)
+ 		return -EOPNOTSUPP;
+-	if (!cfg80211_has_monitors_only(rdev))
+-		return -EBUSY;
++	/*
++	 * Xeno/Kali: allow monitor channel changes even when a normal
++	 * virtual interface is also present (required for many Wi-Fi
++	 * auditing workflows).
++	 */
+ 
+ 	return rdev_set_monitor_channel(rdev, dev, chandef);
+ }

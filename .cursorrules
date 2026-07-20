@@ -42,7 +42,7 @@
 │                                                                              │
 │  [RULE_06] NEVER GUESS PATHS                                                 │
 │  Always use the dynamic workspace detection pattern in all shell scripts:    │
-│  `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`                    │
+│  `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`                   │
 │  Never hardcode '/home/xeno/Xeno-os' or '/home/xeno/xeno-os'.                │
 │                                                                              │
 │  [RULE_07] NEVER INVENT DESIGN VALUES                                        │
@@ -70,14 +70,14 @@
 │  * [WIN_COMP]  Flatpak-isolated Bottles runner with Wine, DXVK, and VKD3D    │
 │  * [GUI_FRAME] Python PySide6 for scientific panels and workspace.           │
 │                TypeScript Astal v2 with Bun runtime for desktop shell bar.   │
-│  * [KERNEL]    XanMod compiled via GitHub Actions using Ubuntu production     │
+│  * [KERNEL]    XanMod compiled via GitHub Actions using Ubuntu production    │
 │                baseline config with Kali mac80211 wireless packet            │
 │                injection patches.                                            │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 3. FILE SYSTEM AND PROJECT LAYOUT ──────────────────────────────────────── │
+│ ── 3. FILE SYSTEM AND PROJECT LAYOUT ────────────────────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ~/Xeno-os/                                                                  │
@@ -108,7 +108,7 @@
 │  │   │       └── i386-pc/             # GRUB modules                         │
 │  │   └── output/                      # Target path for final bootable ISOs  │
 │  ├── desktop/                                                                │
-│  │   ├── theme.py                     # SINGLE SOURCE OF TRUTH (Python tokens)│
+│  │   ├── theme.py                    # SINGLE SOURCE OF TRUTH (Python tokens)│
 │  │   │                                # User-defined. Never duplicated.      │
 │  │   ├── shell/                       # TypeScript Astal v2 project          │
 │  │   │   ├── theme.ts                 # TS theme tokens (mirrors theme.py)   │
@@ -135,7 +135,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 4. CRITICAL ENGINEERING RESOLUTIONS ────────────────────────────────────── │
+│ ── 4. CRITICAL ENGINEERING RESOLUTIONS ──────────────────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  [RESO_01] UNIVERSAL DRIVER STRATEGY                                         │
@@ -143,7 +143,7 @@
 │  a stripped-down build). It does not use `make x86_64_defconfig`. Instead,   │
 │  it uses the complete Ubuntu Production Baseline config from the GitHub      │
 │  Actions runner at `/boot/config-$(uname -r)`, ensuring 100% hardware,       │
-│  peripheral, and VM compatibility (including vboxguest, vboxvideo,          │
+│  peripheral, and VM compatibility (including vboxguest, vboxvideo,           │
 │  hv_vmbus, hv_storvsc, and hyperv_drm compiled as modules). These modules    │
 │  consume zero RAM unless the specific hypervisor or hardware is detected.    │
 │                                                                              │
@@ -156,7 +156,7 @@
 │  Debian live-boot conflicts with Ubuntu's casper stack at boot. The rootfs   │
 │  must have casper installed and live-boot completely purged. The squashfs    │
 │  must be at `iso/build/casper/filesystem.squashfs`, and the GRUB line must   │
-│  use `boot=casper` not `boot=live`.                                           │
+│  use `boot=casper` not `boot=live`.                                          │
 │                                                                              │
 │  [RESO_04] VM GRAPHICS FALLBACK                                              │
 │  Hyper-V and VirtualBox lack Vulkan drivers. Hyprland crashes on boot. The   │
@@ -178,7 +178,7 @@
 │                                                                              │
 │  [RESO_06] WSL2 PATH CASE SENSITIVITY                                        │
 │  Scripts must use dynamic path detection not hardcoded paths. Use:           │
-│  `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`                    │
+│  `WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"`                   │
 │                                                                              │
 │  [RESO_07] CASPER GRUB PARAMETERS                                            │
 │  The correct GRUB bootloader parameters for Ubuntu Casper are:               │
@@ -189,7 +189,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 5. CODE-LEVEL AI GUARDRAILS ────────────────────────────────────────────── │
+│ ── 5. CODE-LEVEL AI GUARDRAILS ──────────────────────────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  [GUARD_A] MULTI-THREADING MEMORY BOUNDS (PySide6 Mandatory Pattern)         │
@@ -204,7 +204,7 @@
 │  matplotlib.use('Agg')                                                       │
 │                                                                              │
 │  # STEP 2: Now import matplotlib components                                  │
-│  from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg            │
+│  from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg             │
 │  from matplotlib.figure import Figure                                        │
 │                                                                              │
 │  # STEP 3: PySide6 imports                                                   │
@@ -229,7 +229,7 @@
 │  class Worker(QThread):                                                      │
 │      def run(self):                                                          │
 │          self.panel.label.setText("Done")      # CRASH - wrong thread        │
-│          self.canvas.draw()                     # CRASH - SIGSEGV             │
+│          self.canvas.draw()                     # CRASH - SIGSEGV            │
 │          self.fig.savefig("out.png")           # CRASH - wrong thread        │
 │  ```                                                                         │
 │                                                                              │
@@ -253,8 +253,8 @@
 │          self._thread = QThread()                                            │
 │          self._worker = Worker()                                             │
 │          self._worker.moveToThread(self._thread)                             │
-│          self._worker.result_ready.connect(self.on_result, Qt.QueuedConnection) │
-│          self._worker.error_occurred.connect(self.on_error, Qt.QueuedConnection) │
+│        self._worker.result_ready.connect(self.on_result, Qt.QueuedConnection)│
+│       self._worker.error_occurred.connect(self.on_error, Qt.QueuedConnection)│
 │          self._thread.start()                                                │
 │      def on_result(self, payload):                                           │
 │          # SAFE: Runs on main thread                                         │
@@ -312,17 +312,17 @@
 │  The words `iso/build/live` must never appear in any command you generate.   │
 │  The correct path is always `iso/build/casper`. The squashfs file is always  │
 │  at `iso/build/casper/filesystem.squashfs`. The kernel is at                 │
-│  `iso/build/casper/vmlinuz`. The initrd is at `iso/build/casper/initrd`.      │
+│  `iso/build/casper/vmlinuz`. The initrd is at `iso/build/casper/initrd`.     │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 6. XENO OS THEME SYSTEM (SCHEMATIC TOKENS ONLY) ────────────────────────── │
+│ ── 6. XENO OS THEME SYSTEM (SCHEMATIC TOKENS ONLY) ──────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  All visual identity for Xeno OS — colors, typography, spacing, radii,       │
 │  iconography sizing — is decided by the user, not the AI. This section       │
-│  defines the token schema only (the names every panel and shell component   │
+│  defines the token schema only (the names every panel and shell component    │
 │  is allowed to reference). It intentionally contains no colors, no font      │
 │  names, no pixel values. Those live exclusively in `desktop/theme.py`        │
 │  (Python/PySide6 side) and `desktop/shell/theme.ts` (TypeScript/Astal side). │
@@ -435,7 +435,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 7. COMPLETE BASE PANEL ARCHITECTURE ────────────────────────────────────── │
+│ ── 7. COMPLETE BASE PANEL ARCHITECTURE ──────────────────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  This is the mandatory base class. Every scientific panel inherits from      │
@@ -445,11 +445,11 @@
 │  ```python                                                                   │
 │  # FILE: ~/Xeno-os/desktop/panels/base_panel.py                              │
 │  # PURPOSE: Thread-safe base class for all Xeno OS scientific panels         │
-│  # RULE: matplotlib.use('Agg') MUST be called before any other matplotlib import │
+│                                                                              │
 │                                                                              │
 │  import matplotlib                                                           │
 │  matplotlib.use('Agg')                                                       │
-│  from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg            │
+│  from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg             │
 │  from matplotlib.figure import Figure                                        │
 │  import numpy as np                                                          │
 │  from PySide6.QtWidgets import QWidget, QVBoxLayout, QApplication            │
@@ -461,7 +461,7 @@
 │      error_occurred = Signal(str)                                            │
 │      progress       = Signal(int)                                            │
 │      def compute(self, *args, **kwargs):                                     │
-│          raise NotImplementedError("Subclass BaseWorker and override compute()") │
+│      raise NotImplementedError("Subclass BaseWorker and override compute()") │
 │                                                                              │
 │  class BasePanel(QWidget):                                                   │
 │      def __init__(self, parent=None):                                        │
@@ -477,8 +477,8 @@
 │          self._thread = QThread()                                            │
 │          self._worker = self.create_worker()                                 │
 │          self._worker.moveToThread(self._thread)                             │
-│          self._worker.result_ready.connect(self.on_result, Qt.QueuedConnection) │
-│          self._worker.error_occurred.connect(self.on_error, Qt.QueuedConnection) │
+│       self._worker.result_ready.connect(self.on_result, Qt.QueuedConnection) │
+│      self._worker.error_occurred.connect(self.on_error, Qt.QueuedConnection) │
 │          self._worker.progress.connect(self.on_progress, Qt.QueuedConnection)│
 │          self._thread.start()                                                │
 │          self._layout = QVBoxLayout(self)                                    │
@@ -501,7 +501,7 @@
 │          pass                                                                │
 │      def trigger_compute(self, *args):                                       │
 │          QMetaObject.invokeMethod(                                           │
-│              self._worker, "compute", Qt.QueuedConnection, *[arg for arg in args] │
+│         self._worker, "compute", Qt.QueuedConnection, *[arg for arg in args] │
 │          )                                                                   │
 │      def make_matplotlib_canvas(self, figsize=(7, 3.5)):                     │
 │          fig = Figure(figsize=figsize, facecolor=theme.bg)                   │
@@ -525,7 +525,7 @@
 │          self._canvas = None; self._fig = None; self._ax = None              │
 │          super().__init__(parent)                                            │
 │      def create_ui(self):                                                    │
-│          self._canvas, self._fig, self._ax = self.make_matplotlib_canvas()    │
+│         self._canvas, self._fig, self._ax = self.make_matplotlib_canvas()    │
 │          self._layout.addWidget(self._canvas)                                │
 │      @property                                                               │
 │      def canvas(self): return self._canvas                                   │
@@ -544,7 +544,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ── 8. PHASE 2 COMPONENT INVENTORY ─────────────────────────────────────────── │
+│ ── 8. PHASE 2 COMPONENT INVENTORY ───────────────────────────────────────────│
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  This is the complete list of GUI components to build. Each one is a         │

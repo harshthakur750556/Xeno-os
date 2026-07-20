@@ -4,13 +4,14 @@ on:
   push:
     paths:
       - 'kernel/patches/**'
+      - 'kernel/configs/**'
       - 'kernel/build-kernel.sh'
+      - 'kernel/validate-kernel-deb.sh'
       - '.github/workflows/build-kernel.yml'
   workflow_dispatch:
   schedule:
     - cron: '0 2 1 * *'
 
-# Grant permission to create Releases and upload assets
 permissions:
   contents: write
 
@@ -27,8 +28,6 @@ jobs:
         run: |
           echo "=== Disk Space Before Cleanup ==="
           df -h
-          
-          # Remove heavy preinstalled tools & SDKs
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/share/swift
@@ -38,10 +37,7 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/node
           sudo rm -rf /opt/hostedtoolcache/go
           sudo rm -rf /opt/hostedtoolcache/Ruby
-          
-          # Clean system package caches
           sudo apt-get clean
-          
           echo "=== Disk Space After Cleanup ==="
           df -h
 
@@ -61,7 +57,7 @@ jobs:
 
       - name: Build Xeno OS kernel
         run: |
-          chmod +x kernel/build-kernel.sh
+          chmod +x kernel/build-kernel.sh kernel/validate-kernel-deb.sh
           bash kernel/build-kernel.sh
 
       - name: Upload kernel packages to artifact store
@@ -69,22 +65,29 @@ jobs:
         with:
           name: xeno-kernel-debs
           path: kernel/output/*.deb
-          retention-days: 1
+          retention-days: 3
 
   publish_release:
     name: Publish GitHub Release
     needs: compile_kernel
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only run release generation on actual push or manual dispatch
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download kernel packages from compilation job
         uses: actions/download-artifact@v4
         with:
           name: xeno-kernel-debs
           path: ./kernel-debs
+
+      - name: Validate downloaded debs
+        run: |
+          chmod +x kernel/validate-kernel-deb.sh
+          bash kernel/validate-kernel-deb.sh ./kernel-debs
 
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v1
@@ -93,7 +96,20 @@ jobs:
           name: "Xeno OS Kernel Build ${{ needs.compile_kernel.outputs.run_number }}"
           files: ./kernel-debs/*.deb
           body: |
-            Xeno OS custom kernel with XanMod optimizations and Kali wireless injection patches.
-            Install with: sudo dpkg -i linux-image-*.deb linux-headers-*.deb
+            Xeno OS custom XanMod kernel with:
+            - Full CONFIG_WLAN + major in-tree Wi-Fi drivers
+            - Kali-oriented mac80211 / cfg80211 injection patches
+            - PREEMPT + 1000Hz + NTSYNC (Windows app smoothness)
+
+            Install:
+            ```
+            sudo dpkg -i linux-image-*.deb linux-headers-*.deb
+            sudo update-initramfs -u
+            ```
+
+            Validate before shipping:
+            ```
+            bash kernel/validate-kernel-deb.sh .
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
