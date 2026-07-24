@@ -140,9 +140,9 @@
 │                                                                              │
 │  [RESO_01] UNIVERSAL DRIVER STRATEGY                                         │
 │  The kernel is a full-featured, complete production-grade XanMod kernel (not │
-│  a stripped-down build). It uses official XanMod baseline configs merged with│
-│  kernel/configs/xeno.config.fragment (falling back to host Ubuntu config     │
-│  if XanMod baseline is unavailable). This provides full driver support,      │
+│  a stripped-down build). It uses a pinned XanMod release tag baseline merged  │
+│  with kernel/configs/xeno.config.fragment (falling back to host Ubuntu       │
+│  config if XanMod baseline is unavailable). This provides full driver support,│
 │  BORE scheduling, PREEMPT, 1000Hz timer, NTSYNC, and mac80211 injection.    │
 │                                                                              │
 │  [RESO_02] CRYPTOGRAPHIC SIGNATURE BYPASS                                    │

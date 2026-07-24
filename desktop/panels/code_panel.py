@@ -57,10 +57,42 @@ class CodePanel(BasePanel):
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
 
+        # Execution Isolation: 30s timeout & error boundary handling
+        orig_run_cell = self.kernel.shell.run_cell
+        def run_cell_with_isolation(raw_cell, *args, **kwargs):
+            import signal
+            def alarm_handler(signum, frame):
+                raise TimeoutError("Execution timed out (30s limit exceeded)")
+            
+            old_handler = None
+            if hasattr(signal, "SIGALRM"):
+                old_handler = signal.signal(signal.SIGALRM, alarm_handler)
+                signal.alarm(30)
+            try:
+                return orig_run_cell(raw_cell, *args, **kwargs)
+            except Exception as e:
+                print(f"[CodePanel Execution Error] {e}")
+                raise
+            finally:
+                if hasattr(signal, "SIGALRM"):
+                    signal.alarm(0)
+                    if old_handler is not None:
+                        signal.signal(signal.SIGALRM, old_handler)
+
+        self.kernel.shell.run_cell = run_cell_with_isolation
+
         # 3. Create console widget
         self.console = RichJupyterWidget()
         self.console.kernel_manager = self.kernel_manager
         self.console.kernel_client = self.kernel_client
+        
+        orig_execute = self.console._execute
+        def safe_execute(source, hidden=False):
+            try:
+                return orig_execute(source, hidden)
+            except Exception as e:
+                print(f"[CodePanel Execution Boundary Error] {e}")
+        self.console._execute = safe_execute
         
         # Style Console
         self.console.syntax_style = "monokai"

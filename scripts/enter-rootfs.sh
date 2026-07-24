@@ -10,9 +10,9 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-xeno_chroot_mount "$ROOTFS"
 cleanup() { xeno_chroot_umount "$ROOTFS"; }
 trap cleanup EXIT
+xeno_chroot_mount "$ROOTFS"
 
 echo "Entering Xeno OS rootfs at $ROOTFS"
 chroot "$ROOTFS" /bin/bash

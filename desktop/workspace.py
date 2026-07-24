@@ -22,13 +22,50 @@ import sys
 import os
 import time
 
-# Custom panels
-from desktop.panels.math_panel import MathPanel
-from desktop.panels.data_panel import DataPanel
-from desktop.panels.code_panel import CodePanel
-from desktop.panels.threed_panel import ThreeDPanel
-from desktop.panels.signal_panel import SignalPanel
-from desktop.avatar_controller import AvatarController
+# Custom panels with import fallbacks
+def _make_fallback_panel(name, err_msg):
+    from desktop.panels.base_panel import BasePanel
+    class FallbackPanel(BasePanel):
+        def create_ui(self):
+            lbl = QLabel(f"[{name} Unavailable]\n{err_msg}")
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet(f"color: {theme.error}; font-family: '{theme.font_mono}'; font-size: {theme.size_md}px;")
+            self._layout.addWidget(lbl)
+    return FallbackPanel
+
+try:
+    from desktop.panels.math_panel import MathPanel
+except Exception as e:
+    MathPanel = _make_fallback_panel("Math Panel", str(e))
+
+try:
+    from desktop.panels.data_panel import DataPanel
+except Exception as e:
+    DataPanel = _make_fallback_panel("Data Panel", str(e))
+
+try:
+    from desktop.panels.code_panel import CodePanel
+except Exception as e:
+    CodePanel = _make_fallback_panel("Code Panel", str(e))
+
+try:
+    from desktop.panels.threed_panel import ThreeDPanel
+except Exception as e:
+    ThreeDPanel = _make_fallback_panel("3D Panel", str(e))
+
+try:
+    from desktop.panels.signal_panel import SignalPanel
+except Exception as e:
+    SignalPanel = _make_fallback_panel("Signal Panel", str(e))
+
+try:
+    from desktop.avatar_controller import AvatarController
+except Exception as e:
+    class AvatarController(QObject):
+        state_changed = Signal(str)
+        def __init__(self, parent=None):
+            super().__init__(parent)
+
 
 
 class SysMonitorWorker(QObject):
@@ -391,7 +428,7 @@ class XenoWorkspace(QWidget):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     w = XenoWorkspace()
     w.resize(1200, 800)
     w.setWindowTitle("Xeno OS — Scientific Workspace")

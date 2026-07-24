@@ -21,6 +21,8 @@ xeno_chroot_mount() {
         mkdir -p "$ROOTFS/dev/pts"
         mountpoint -q "$ROOTFS/dev/pts" 2>/dev/null || mount --bind /dev/pts "$ROOTFS/dev/pts" 2>/dev/null || true
     fi
+    mkdir -p "$ROOTFS/run"
+    mountpoint -q "$ROOTFS/run" 2>/dev/null || mount --bind /run "$ROOTFS/run" 2>/dev/null || true
     # DNS for apt inside chroot
     if [ -f /etc/resolv.conf ]; then
         cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null || {
@@ -33,6 +35,7 @@ xeno_chroot_mount() {
 
 xeno_chroot_umount() {
     local ROOTFS="$1"
+    umount -l "$ROOTFS/run" 2>/dev/null || true
     umount -l "$ROOTFS/dev/pts" 2>/dev/null || true
     umount -lR "$ROOTFS/dev" 2>/dev/null || true
     umount -l "$ROOTFS/sys" 2>/dev/null || true

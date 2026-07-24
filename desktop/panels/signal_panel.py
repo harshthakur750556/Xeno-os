@@ -10,8 +10,6 @@ from desktop.theme import theme
 # STEP 5: Scientific libraries
 import numpy as np
 import sympy as sp
-import scipy.signal as sig
-import scipy.fft as fft
 
 # STEP 6: Standard library
 import sys
@@ -27,6 +25,9 @@ class SignalWorker(BaseWorker):
     """
     def compute(self, wave_type, freq, amp, noise, apply_filter, filter_cutoff):
         try:
+            import scipy.signal as sig
+            import scipy.fft as fft
+
             fs = 1000.0  # sampling rate (Hz)
             duration = 1.0  # duration (seconds)
             t = np.linspace(0, duration, int(fs * duration), endpoint=False)

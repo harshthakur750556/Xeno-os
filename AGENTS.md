@@ -21,6 +21,11 @@ Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kerne
 
 ---
 
+## System Credentials & Environment
+* **Root / Sudo Password**: `Harsh@2004Thakur` (Default root/sudo credential for privileged commands, chroot execution, and ISO build pipelines).
+
+---
+
 ## Primary Management Scripts
 
 | Command | Purpose |
@@ -44,7 +49,7 @@ Live Mode (interacts with active Wayland/X11 session):
 python3 tests/run_tests.py --live
 ```
 
-Total Test Count: 72 tests across 4 tiers (Feature Coverage, Boundaries & Stress, Integration Sync, Real-World Flows & Theme Audits).
+Total Test Count: 73 tests across 4 tiers (Feature Coverage, Boundaries & Stress, Integration Sync, Real-World Flows & Theme Audits).
 
 ---
 
@@ -52,7 +57,7 @@ Total Test Count: 72 tests across 4 tiers (Feature Coverage, Boundaries & Stress
 
 ### 1. Python / PySide6 Panels (`desktop/panels/`)
 * **Base Panel**: Subclass `desktop.panels.base_panel.BasePanel`. Do NOT modify `base_panel.py`.
-* **Theme Tokens**: All styling MUST reference `desktop.theme.theme` (`theme.bg`, `theme.accent`, `theme.surface`, etc.).
+* **Theme Tokens**: All styling MUST reference `desktop.theme.theme` in `desktop/theme.py` (`theme.bg`, `theme.accent`, `theme.surface`, etc.).
 * **Threading**: Heavy math/data calculations run in `BaseWorker` (`QObject`) offloaded via `QThread`. Never touch UI elements from worker threads.
 * **Matplotlib Backend**: Set `matplotlib.use('Agg')` before importing any other matplotlib submodules.
 * **Entry Point**: Every panel file MUST include a standalone `if __name__ == "__main__":` test block calling `init_qt_environment()`.
@@ -69,7 +74,7 @@ Total Test Count: 72 tests across 4 tiers (Feature Coverage, Boundaries & Stress
 
 ```
 Xeno-os/
-├── desktop/          # PySide6 panels + TypeScript Astal shell + theme tokens + env.py
+├── desktop/          # PySide6 panels + TypeScript Astal shell + theme tokens (theme.py/theme.ts) + env.py
 ├── drivers/          # Hardware driver packages & setup
 ├── iso/              # ISO build directory (build/casper/, output/)
 ├── kernel/           # XanMod kernel patches, build scripts, GitHub CI output

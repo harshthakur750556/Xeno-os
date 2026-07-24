@@ -53,6 +53,13 @@ export const GLib: any = {
       return [false, ""];
     }
   },
+  shell_quote(str: string): string {
+    if (!str) return "''";
+    if (str.includes(" ")) {
+      return str.split(/\s+/).map(s => "'" + s.replace(/'/g, "'\\''") + "'").join(" ");
+    }
+    return "'" + str.replace(/'/g, "'\\''") + "'";
+  },
   spawn_command_line_async(cmd: string) {
     try {
       const { spawn } = require("child_process");

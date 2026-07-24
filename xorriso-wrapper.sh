@@ -1,5 +1,12 @@
 #!/bin/bash
 # Intercept the arguments sent by grub-mkrescue
+set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+    echo "ERROR: xorriso-wrapper.sh received no arguments"
+    exit 1
+fi
+
 args=()
 for arg in "$@"; do
     args+=("$arg")
@@ -10,3 +17,4 @@ for arg in "$@"; do
 done
 # Pass the modified arguments to the real xorriso
 exec /usr/bin/xorriso "${args[@]}"
+

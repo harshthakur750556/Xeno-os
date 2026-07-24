@@ -52,4 +52,13 @@ class XenoTheme:
     icon_lg          = 32
     touch_target_min = 36
 
+    def __getattr__(self, name: str):
+        if "color" in name or "bg" in name or "surface" in name or "border" in name or "accent" in name or "text" in name or "overlay" in name:
+            return "#ffffff"
+        if "font" in name:
+            return "Inter"
+        if "size" in name or "space" in name or "radius" in name or "padding" in name or "width" in name or "height" in name or "icon" in name or "target" in name:
+            return 12
+        return ""
+
 theme = XenoTheme()

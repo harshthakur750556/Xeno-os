@@ -39,8 +39,16 @@ if [ "$ENABLE_KALI_REPO" = "1" ]; then
     echo "[host] Installing Kali archive key + pinned source (priority 100)..."
     # Official Kali archive keyring package is preferred; fall back to key fetch
     if [ ! -f "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" ]; then
-        curl -fsSL https://archive.kali.org/archive-key.asc \
-            | gpg --dearmor -o "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" || true
+        KEY_TMP=$(mktemp /tmp/kali-key.XXXXXX.asc)
+        if curl -fsSL https://archive.kali.org/archive-key.asc -o "$KEY_TMP" 2>/dev/null; then
+            KALI_FPR="44C6513A8E4FB3D30875F3B1ED444FF07D8D0BF6"
+            if gpg --with-colons "$KEY_TMP" 2>/dev/null | grep -qi "$KALI_FPR" || gpg --show-keys "$KEY_TMP" 2>/dev/null | tr -d ' ' | grep -qi "$KALI_FPR"; then
+                gpg --dearmor -o "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" < "$KEY_TMP" 2>/dev/null || true
+            else
+                echo "[WARN] Kali archive key fingerprint verification failed."
+            fi
+        fi
+        rm -f "$KEY_TMP"
     fi
     cat > "$ROOTFS/etc/apt/sources.list.d/kali-rolling.list" << 'EOF'
 # Kali rolling — PINNED LOW. Do not use for general upgrades.
@@ -55,10 +63,10 @@ Pin-Priority: 100
 EOF
 fi
 
-chroot "$ROOTFS" /bin/bash << 'CHROOT_EOF'
+chroot "$ROOTFS" /bin/bash << CHROOT_EOF
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-export XENO_SECURITY_PROFILE="$XENO_SECURITY_PROFILE"
+export XENO_SECURITY_PROFILE="${XENO_SECURITY_PROFILE}"
 
 
 echo "[1/6] apt update..."
@@ -334,7 +342,10 @@ else
     echo "Applying live-lab security posture..."
     echo "xeno ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/xeno
 fi
+chmod 0440 /etc/sudoers.d/xeno
 
 CHROOT_EOF
+
+chmod 0440 "$ROOTFS/etc/sudoers.d/xeno" 2>/dev/null || true
 
 echo "✓ Security tools ready in rootfs"

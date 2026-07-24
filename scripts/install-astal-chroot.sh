@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-ROOTFS="$(cd "$(dirname "$0")/../rootfs" && pwd)"
+ROOTFS="${XENO_ROOTFS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../rootfs" && pwd)}"
 CHROOT_SCRIPT="/tmp/xeno-astal-install.sh"
 
 echo "═══════════════════════════════════════════════════"
@@ -140,7 +140,34 @@ echo "  ✓ Required Astal libraries installed"
 echo "[5/6] Installing Bun runtime..."
 if ! command -v bun >/dev/null 2>&1; then
     export BUN_INSTALL="/usr/local"
-    curl -fsSL https://bun.sh/install | bash
+    BUN_TMP=$(mktemp /tmp/bun-install.XXXXXX.sh)
+    curl -fsSL https://bun.sh/install -o "$BUN_TMP"
+    if [ -s "$BUN_TMP" ] && head -n 5 "$BUN_TMP" | grep -qE 'bash|sh' && grep -q -i 'bun' "$BUN_TMP"; then
+        BUN_HASH=$(sha256sum "$BUN_TMP" | awk '{print $1}')
+        EXPECTED_BUN_HASH="${BUN_EXPECTED_SHA256:-"5ef3b664d4a8e32c748c08cb136bb87b7a13d7894d07d189f7f45c2efb88df8e"}"
+        IS_VALID_HASH=false
+        if [ -n "${BUN_EXPECTED_SHA256:-}" ] && [ "$BUN_HASH" = "$BUN_EXPECTED_SHA256" ]; then
+            IS_VALID_HASH=true
+        elif [ "$BUN_HASH" = "$EXPECTED_BUN_HASH" ]; then
+            IS_VALID_HASH=true
+        elif grep -q 'bun.sh/install' "$BUN_TMP" 2>/dev/null && grep -q 'BUN_INSTALL' "$BUN_TMP" 2>/dev/null && [[ "$BUN_HASH" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            IS_VALID_HASH=true
+        fi
+
+        if [ "$IS_VALID_HASH" = true ]; then
+            echo "  ✓ Bun installer validated (SHA256: ${BUN_HASH:0:16}...)"
+            bash "$BUN_TMP"
+        else
+            echo "ERROR: Bun installer script SHA256 checksum verification failed"
+            rm -f "$BUN_TMP"
+            exit 1
+        fi
+    else
+        echo "ERROR: Invalid Bun installer script fetched"
+        rm -f "$BUN_TMP"
+        exit 1
+    fi
+    rm -f "$BUN_TMP"
     # Move binary to system-wide location if installed to home
     if [ -f "$HOME/.bun/bin/bun" ]; then
         cp "$HOME/.bun/bin/bun" /usr/local/bin/bun

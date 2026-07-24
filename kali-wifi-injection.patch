@@ -1,9 +1,0 @@
-# DEPRECATED — do not apply this file directly.
-#
-# The maintained Kali/Xeno wireless injection series lives in:
-#   kernel/patches/0001-mac80211-injection-sequence-and-qos.patch
-#   kernel/patches/0002-cfg80211-allow-monitor-channel-change.patch
-#   kernel/patches/0003-legacy-usb-wifi-injection-helpers.patch
-#
-# Built by: kernel/build-kernel.sh
-# Validated by: kernel/validate-kernel-deb.sh

@@ -316,6 +316,14 @@ class ThreeDPanel(BasePanel):
         self.compute_btn.setEnabled(True)
         self.compute_btn.setText("Render")
 
+    def closeEvent(self, event):
+        try:
+            if self.vtkWidget is not None:
+                self.vtkWidget.Finalize()
+        except Exception as e:
+            print(f"[ThreeDPanel Close Error] {e}")
+        super().closeEvent(event)
+
 
 if __name__ == "__main__":
     from desktop.env import init_qt_environment

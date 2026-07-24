@@ -197,10 +197,19 @@ export function initWorkspaces() {
 let notificationCounter = 0;
 
 export function handleIPCRequest(request: any): any {
-  const cmd = request.command;
-  const params = request.params || {};
+  if (!request || typeof request !== "object" || !request.command) {
+    return { status: "error", message: "Invalid payload: request must be an object with a command property" };
+  }
+  try {
+    const cmd = String(request.command);
+    const params = request.params || {};
   
-  switch (cmd) {
+    switch (cmd) {
+    case "shell:reload":
+      launcherVisible.set(false);
+      highlightedIndex.set(0);
+      return { status: "success", message: "Shell state reloaded" };
+
     // Simulator Controls
     case "simulator:set_clock":
       clockOverridden = true;
@@ -443,6 +452,9 @@ export function handleIPCRequest(request: any): any {
 
     default:
       return { status: "error", message: `Unknown IPC command: ${cmd}` };
+    }
+  } catch (err: any) {
+    return { status: "error", message: `IPC execution error: ${err.message || String(err)}` };
   }
 }
 

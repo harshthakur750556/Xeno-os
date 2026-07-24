@@ -130,6 +130,16 @@ window {
   console.log("Dynamically constructed CSS stylesheet written to /tmp/neonic-shell.css");
 }
 
+// Global Error Boundary (S3)
+if (typeof process !== "undefined") {
+  process.on("uncaughtException", (err: any) => {
+    console.error("[Shell Error Boundary] Uncaught Exception:", err);
+  });
+  process.on("unhandledRejection", (reason: any) => {
+    console.error("[Shell Error Boundary] Unhandled Rejection:", reason);
+  });
+}
+
 // 2. Start UNIX domain socket IPC server
 function startIPCServer() {
   const socketPath = process.env.XENO_IPC_SOCKET || "/tmp/xeno-ipc.sock";
@@ -145,8 +155,33 @@ function startIPCServer() {
   try {
     Bun.listen({
       socket: {
+        open(socket: any) {
+          // Strict IPC Socket Peer UID Verification
+          if (typeof socket.getPeerCredentials === "function") {
+            const creds = socket.getPeerCredentials();
+            if (creds && typeof creds.uid === "number" && typeof process.getuid === "function") {
+              const currentUid = process.getuid();
+              if (creds.uid !== currentUid && creds.uid !== 0) {
+                console.warn(`[IPC Security] Rejected connection from unauthorized peer UID: ${creds.uid}`);
+                socket.end();
+                return;
+              }
+            }
+          }
+        },
         data(socket: any, data: any) {
           try {
+            if (typeof socket.getPeerCredentials === "function") {
+              const creds = socket.getPeerCredentials();
+              if (creds && typeof creds.uid === "number" && typeof process.getuid === "function") {
+                const currentUid = process.getuid();
+                if (creds.uid !== currentUid && creds.uid !== 0) {
+                  socket.write(JSON.stringify({ status: "error", message: "Unauthorized socket peer UID" }));
+                  socket.end();
+                  return;
+                }
+              }
+            }
             const reqStr = data.toString("utf-8");
             const request = JSON.parse(reqStr);
             const response = handleIPCRequest(request);
@@ -159,7 +194,9 @@ function startIPCServer() {
       },
       unix: socketPath
     });
-    console.log(`IPC server listening on unix socket: ${socketPath}`);
+    // Enforce strict socket file permissions (0700)
+    fs.chmodSync(socketPath, 0o700);
+    console.log(`IPC server listening on unix socket: ${socketPath} with permissions 0700`);
   } catch (e) {
     console.error("Failed to start IPC server:", e);
   }
@@ -174,12 +211,16 @@ startNotificationServer();
 startIPCServer();
 
 // Start Astal Application
-App.start({
-  instanceName: "neonic-shell",
-  css: "/tmp/neonic-shell.css",
-  main() {
-    Bar();
-    Launcher();
-    Notifications();
-  }
-});
+try {
+  App.start({
+    instanceName: "neonic-shell",
+    css: "/tmp/neonic-shell.css",
+    main() {
+      Bar();
+      Launcher();
+      Notifications();
+    }
+  });
+} catch (e) {
+  console.error("[App.start Error]", e);
+}

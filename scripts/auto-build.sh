@@ -12,6 +12,7 @@ fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
 META_FILE="$CACHE_DIR/latest_release.json"
+VOLUME_ID="XENOOS"
 # shellcheck source=/dev/null
 source "$WS_DIR/scripts/lib-chroot.sh"
 
@@ -21,6 +22,12 @@ if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: run as root: sudo bash scripts/auto-build.sh"
     exit 1
 fi
+
+exec 9>/tmp/xeno-auto-build.lock
+if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import fcntl; fcntl.fcntl(9, fcntl.F_SETFD, fcntl.FD_CLOEXEC)' 2>/dev/null || true
+fi
+flock -n --cloexec 9 2>/dev/null || flock -n 9 || { echo "ERROR: auto-build.sh is already running."; exit 1; }
 
 echo "=== Xeno OS Automated Packaging Pipeline ==="
 echo "Workspace: $WS_DIR"
@@ -220,9 +227,32 @@ EOF
 
 # ── 7. Sync desktop + install feature stacks if missing ──────
 echo "Syncing desktop environment and tests into rootfs..."
-rsync -a --delete "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
-rsync -a --delete "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
+rsync -a --delete \
+    --exclude='*.local' \
+    --exclude='.config/' \
+    --exclude='custom/' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='*.pyo' \
+    --exclude='.pytest_cache' \
+    --exclude='node_modules' \
+    --exclude='.git' \
+    "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
+
+rsync -a --delete \
+    --exclude='*.local' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='*.pyo' \
+    --exclude='.pytest_cache' \
+    --exclude='.git' \
+    "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
 chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/tests" 2>/dev/null || true
+
+# T9: Clean up developer history files so they do not leak into ISO
+rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
+rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
+
 
 # Ensure Windows + security tools present (idempotent)
 if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
@@ -263,6 +293,7 @@ grub-mkimage -O i386-pc -o "$WS_DIR/iso/build/boot/grub/i386-pc/eltorito.img" \
 echo "Generating bootable ISO..."
 mkdir -p "$WS_DIR/iso/output"
 grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
+    -volid "$VOLUME_ID" \
     -o "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$WS_DIR/iso/build/"
 
 cp "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$TARGET_ISO" 2>/dev/null || true

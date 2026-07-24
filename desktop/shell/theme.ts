@@ -46,3 +46,10 @@ export const theme = {
   iconLg: 32,
   touchTargetMin: 36,
 };
+
+export function validateColor(hex: string, fallback: string = "#ffffff"): string {
+  if (typeof hex === "string" && /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6,8})$/.test(hex)) {
+    return hex;
+  }
+  return fallback;
+}

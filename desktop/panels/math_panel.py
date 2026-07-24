@@ -226,6 +226,11 @@ class MathPanel(MatplotlibPanel):
         plot_data = result["plot_data"]
         var_str = result["var_str"]
 
+        try:
+            import matplotlib.pyplot as plt
+            plt.close('all')
+        except Exception:
+            pass
         self.ax.clear()
         
         # Restore styles

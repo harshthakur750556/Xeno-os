@@ -37,6 +37,11 @@ class DataWorker(BaseWorker):
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"File not found: {file_path}")
             
+            # File size validation (100MB max threshold)
+            max_bytes = 100 * 1024 * 1024
+            if os.path.getsize(file_path) > max_bytes:
+                raise ValueError("File exceeds maximum allowed size threshold of 100MB")
+            
             df = pd.read_csv(file_path)
             columns = list(df.columns)
             

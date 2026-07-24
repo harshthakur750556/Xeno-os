@@ -5,6 +5,7 @@
 set -euo pipefail
 
 KERNEL_SUFFIX="-xeno1"
+XANMOD_TAG="${XANMOD_TAG:-6.12.10-xanmod1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # GitHub Actions sets GITHUB_WORKSPACE; fall back to repo root locally
@@ -39,8 +40,12 @@ mkdir -p "$BUILD_ROOT" "$OUT_DIR"
 cd "$BUILD_ROOT"
 rm -rf linux-xanmod
 
-echo "--- Downloading XanMod source ---"
-git clone --depth=1 https://gitlab.com/xanmod/linux.git linux-xanmod
+echo "--- Downloading XanMod source (pinned tag: ${XANMOD_TAG}) ---"
+if ! git clone --depth 1 --branch "$XANMOD_TAG" https://gitlab.com/xanmod/linux.git linux-xanmod 2>/dev/null; then
+    echo "Single branch clone failed; cloning repository and checking out $XANMOD_TAG..."
+    git clone https://gitlab.com/xanmod/linux.git linux-xanmod
+    (cd linux-xanmod && git checkout "$XANMOD_TAG")
+fi
 cd linux-xanmod
 
 apply_patch() {
@@ -48,17 +53,22 @@ apply_patch() {
     local name
     name="$(basename "$patch_file")"
     echo "Applying: $name"
+    local dry_log
+    dry_log="$(mktemp /tmp/xeno-patch-dry.XXXXXX.log)"
     # Already-applied patches print reverse-hunk messages; treat as OK
-    if patch -p1 --forward --dry-run < "$patch_file" >/tmp/xeno-patch-dry.log 2>&1; then
+    if patch -p1 --forward --dry-run < "$patch_file" >"$dry_log" 2>&1; then
         patch -p1 --forward < "$patch_file"
         echo "  ✓ applied $name"
+        rm -f "$dry_log"
     else
-        if grep -qiE 'previously applied|Reversed \(or previously applied\)|Ignoring previously applied' /tmp/xeno-patch-dry.log; then
+        if grep -qiE 'previously applied|Reversed \(or previously applied\)|Ignoring previously applied' "$dry_log"; then
             echo "  ✓ already applied: $name"
+            rm -f "$dry_log"
             return 0
         fi
         echo "ERROR: required patch failed: $name"
-        cat /tmp/xeno-patch-dry.log
+        cat "$dry_log"
+        rm -f "$dry_log"
         exit 1
     fi
 }
