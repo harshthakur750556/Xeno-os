@@ -41,8 +41,23 @@ cd "$BUILD_ROOT"
 rm -rf linux-xanmod
 
 echo "--- Downloading XanMod source (pinned tag: ${XANMOD_TAG}) ---"
-if ! git clone --depth 1 --branch "$XANMOD_TAG" https://gitlab.com/xanmod/linux.git linux-xanmod 2>/dev/null; then
-    echo "Single branch clone failed; cloning repository and checking out $XANMOD_TAG..."
+MAX_RETRIES=3
+RETRY=0
+CLONED=0
+while [ "$RETRY" -lt "$MAX_RETRIES" ]; do
+    RETRY=$((RETRY+1))
+    echo "Attempt $RETRY of $MAX_RETRIES: cloning XanMod source..."
+    if git clone --depth 1 --branch "$XANMOD_TAG" https://gitlab.com/xanmod/linux.git linux-xanmod; then
+        CLONED=1
+        break
+    else
+        echo "Clone attempt $RETRY failed; retrying in 5 seconds..."
+        sleep 5
+    fi
+done
+
+if [ "$CLONED" -ne 1 ]; then
+    echo "Single-branch shallow clone failed after retries; attempting full clone..."
     git clone https://gitlab.com/xanmod/linux.git linux-xanmod
     (cd linux-xanmod && git checkout "$XANMOD_TAG")
 fi
@@ -55,22 +70,34 @@ apply_patch() {
     echo "Applying: $name"
     local dry_log
     dry_log="$(mktemp /tmp/xeno-patch-dry.XXXXXX.log)"
-    # Already-applied patches print reverse-hunk messages; treat as OK
-    if patch -p1 --forward --dry-run < "$patch_file" >"$dry_log" 2>&1; then
-        patch -p1 --forward < "$patch_file"
-        echo "  ✓ applied $name"
+
+    # 1. Try git apply first if inside git tree
+    if git apply --check "$patch_file" >"$dry_log" 2>&1; then
+        git apply "$patch_file"
+        echo "  ✓ applied $name (via git apply)"
         rm -f "$dry_log"
-    else
-        if grep -qiE 'previously applied|Reversed \(or previously applied\)|Ignoring previously applied' "$dry_log"; then
-            echo "  ✓ already applied: $name"
-            rm -f "$dry_log"
-            return 0
-        fi
-        echo "ERROR: required patch failed: $name"
-        cat "$dry_log"
-        rm -f "$dry_log"
-        exit 1
+        return 0
     fi
+
+    # 2. Try patch with forward & ignore-whitespace flags
+    if patch -p1 --forward --ignore-whitespace --dry-run < "$patch_file" >"$dry_log" 2>&1; then
+        patch -p1 --forward --ignore-whitespace < "$patch_file"
+        echo "  ✓ applied $name (via patch)"
+        rm -f "$dry_log"
+        return 0
+    fi
+
+    # 3. Check if patch is already applied
+    if grep -qiE 'previously applied|Reversed \(or previously applied\)|Ignoring previously applied|already applied' "$dry_log"; then
+        echo "  ✓ already applied: $name"
+        rm -f "$dry_log"
+        return 0
+    fi
+
+    echo "ERROR: required patch failed: $name"
+    cat "$dry_log"
+    rm -f "$dry_log"
+    exit 1
 }
 
 echo "--- Applying wireless injection patches ---"
@@ -110,6 +137,8 @@ fi
 # Clear Ubuntu-style locked key paths that break offline CI builds
 ./scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS "" || true
 ./scripts/config --set-str CONFIG_SYSTEM_REVOCATION_KEYS "" || true
+./scripts/config --set-str CONFIG_MODULE_SIG_KEY "" || true
+./scripts/config --disable CONFIG_MODULE_SIG_ALL || true
 make olddefconfig
 
 echo "--- Merging Xeno config fragment (WLAN + NTSYNC + latency) ---"
@@ -145,11 +174,15 @@ fi
 ./scripts/config --enable CONFIG_NTSYNC || ./scripts/config --module CONFIG_NTSYNC || true
 ./scripts/config --enable CONFIG_MODULES
 ./scripts/config --disable CONFIG_MODULE_SIG_FORCE || true
+./scripts/config --disable CONFIG_MODULE_SIG_ALL || true
 ./scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
 ./scripts/config --set-str CONFIG_SYSTEM_REVOCATION_KEYS ""
+./scripts/config --set-str CONFIG_MODULE_SIG_KEY ""
 ./scripts/config --disable CONFIG_DEBUG_INFO || true
+./scripts/config --disable CONFIG_DEBUG_INFO_BTF || true
 ./scripts/config --disable CONFIG_DEBUG_INFO_DWARF5 || true
 ./scripts/config --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT || true
+./scripts/config --disable CONFIG_PAHOLE_HAS_SPLIT_BTF || true
 ./scripts/config --enable CONFIG_DEBUG_INFO_NONE || true
 
 # Popular drivers as modules (ignore if symbol renamed on this tree)

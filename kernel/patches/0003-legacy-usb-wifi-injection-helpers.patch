@@ -45,7 +45,7 @@
  		BIT(NL80211_IFTYPE_MESH_POINT) |
 --- a/drivers/net/wireless/realtek/rtl818x/rtl8187/dev.c
 +++ b/drivers/net/wireless/realtek/rtl818x/rtl8187/dev.c
-@@ -248,8 +248,16 @@ static void rtl8187_tx(struct ieee80211_
+@@ -248,8 +248,17 @@ static void rtl8187_tx(struct ieee80211_
  	flags |= RTL818X_TX_DESC_FLAG_NO_ENC;
  
  	flags |= ieee80211_get_tx_rate(dev, info)->hw_value << 24;

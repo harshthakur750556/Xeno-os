@@ -37,6 +37,7 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/node
           sudo rm -rf /opt/hostedtoolcache/go
           sudo rm -rf /opt/hostedtoolcache/Ruby
+          sudo rm -rf /opt/hostedtoolcache/Java*
           sudo apt-get clean
           echo "=== Disk Space After Cleanup ==="
           df -h
@@ -90,7 +91,7 @@ jobs:
           bash kernel/validate-kernel-deb.sh ./kernel-debs
 
       - name: Create GitHub Release and Upload Assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: kernel-${{ needs.compile_kernel.outputs.run_number }}
           name: "Xeno OS Kernel Build ${{ needs.compile_kernel.outputs.run_number }}"
