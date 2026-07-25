@@ -5,15 +5,31 @@
 set -euo pipefail
 
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET_ISO="/mnt/c/Users/harsh/xeno_os-4.0-alpha.iso"
-if [ ! -d "/mnt/c/Users/harsh" ]; then
-    TARGET_ISO="$WS_DIR/iso/output/xeno_os-4.0-alpha.iso"
+VERSION_FILE="$WS_DIR/iso/version.txt"
+mkdir -p "$WS_DIR/iso"
+if [ -f "$VERSION_FILE" ]; then
+    BUILD_VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
+else
+    BUILD_VERSION="4.0"
+fi
+
+ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
+if [ -n "${XENO_ISO_DEST:-}" ]; then
+    if [ -d "$XENO_ISO_DEST" ]; then
+        TARGET_ISO="$XENO_ISO_DEST/${ISO_NAME}"
+    else
+        TARGET_ISO="$XENO_ISO_DEST"
+    fi
+elif [ -d "/mnt/c/Users/harsh" ]; then
+    TARGET_ISO="/mnt/c/Users/harsh/${ISO_NAME}"
+else
+    TARGET_ISO="$WS_DIR/iso/output/${ISO_NAME}"
 fi
 
 # Clean up all older ISO versions (v1, v2, v3, etc.)
-find "$WS_DIR/iso/output" -name "xeno_os*.iso" ! -name "xeno_os-4.0-alpha.iso" -delete 2>/dev/null || true
-if [ -d "/mnt/c/Users/harsh" ]; then
-    find /mnt/c/Users/harsh -maxdepth 1 -name "xeno_os*.iso" ! -name "xeno_os-4.0-alpha.iso" -delete 2>/dev/null || true
+find "$WS_DIR/iso/output" -name "xeno_os*.iso" ! -name "${ISO_NAME}" -delete 2>/dev/null || true
+if [ -d "$(dirname "$TARGET_ISO")" ] && [ "$TARGET_ISO" != "$WS_DIR/iso/output/${ISO_NAME}" ]; then
+    find "$(dirname "$TARGET_ISO")" -maxdepth 1 -name "xeno_os*.iso" ! -name "${ISO_NAME}" -delete 2>/dev/null || true
 fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
@@ -135,7 +151,68 @@ else
     XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/fix-kernel-rootfs.sh" || true
 fi
 
-# ── 5. Casper / initramfs essentials ─────────────────────────
+# ── 5. Sync desktop & install feature stacks ─────────────────
+echo "Syncing desktop environment and tests into rootfs..."
+rsync -a --delete \
+    --exclude='*.local' \
+    --exclude='.config/' \
+    --exclude='custom/' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='*.pyo' \
+    --exclude='.pytest_cache' \
+    --exclude='node_modules' \
+    --exclude='.git' \
+    "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
+
+rsync -a --delete \
+    --exclude='*.local' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='*.pyo' \
+    --exclude='.pytest_cache' \
+    --exclude='.git' \
+    "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
+chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/tests" 2>/dev/null || true
+
+# Clean up developer history files so they do not leak into ISO
+rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
+rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
+
+# Ensure Windows + security tools present (idempotent)
+if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
+    run_feature_step() {
+        local step_name="$1"
+        shift
+        echo "Installing ${step_name} into rootfs..."
+        if ! "$@"; then
+            if [ "${XENO_STRICT_BUILD:-0}" = "1" ]; then
+                echo "FATAL: ${step_name} failed under XENO_STRICT_BUILD=1"
+                exit 1
+            else
+                echo "WARNING: ${step_name} setup had errors (non-fatal mode)"
+            fi
+        fi
+    }
+
+    if [ ! -x "$ROOTFS/usr/bin/xeno-windows" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        run_feature_step "Windows compatibility stack" bash "$WS_DIR/scripts/setup-compat-stack.sh"
+    fi
+    if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        run_feature_step "Security/wireless tools" bash "$WS_DIR/scripts/setup-security-tools.sh"
+    fi
+    if [ ! -x "$ROOTFS/usr/bin/xeno-ai-engine" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
+        run_feature_step "AI Engine" bash "$WS_DIR/scripts/setup-ai.sh"
+    fi
+    if [ -x "$WS_DIR/drivers/install-oot-wifi.sh" ]; then
+        run_feature_step "OOT WiFi drivers" env XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh"
+    fi
+fi
+
+# Re-assert no broken packages after feature setup
+xeno_assert_no_broken_pkgs "$ROOTFS"
+
+# ── 6. Casper / initramfs essentials ─────────────────────────
 echo "Mounting rootfs and ensuring casper live stack..."
 xeno_chroot_mount "$ROOTFS"
 cleanup_mounts() { xeno_chroot_umount "$ROOTFS"; }
@@ -168,7 +245,6 @@ done
 
 # Select boot kernel: prefer validated xeno, else generic
 if ls /boot/vmlinuz-*xeno* >/dev/null 2>&1; then
-    # Ignore dpkg-new leftovers
     KIMG=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
 else
     KIMG=""
@@ -184,6 +260,7 @@ NEW_VERSION="${KIMG#/boot/vmlinuz-}"
 echo "Boot kernel version: $NEW_VERSION"
 echo "Regenerating initramfs with casper live boot modules for $NEW_VERSION..."
 update-initramfs -u -k "$NEW_VERSION" || update-initramfs -c -k "$NEW_VERSION"
+
 # Reject broken package state
 bad=$(dpkg -l | awk '$1 ~ /U|H|R|F/ {print $2}')
 if [ -n "$bad" ]; then
@@ -197,14 +274,13 @@ if find /lib/modules -name '*.dpkg-new' 2>/dev/null | grep -q .; then
     exit 1
 fi
 apt-get clean
-# Export for outer script via file
 echo "$NEW_VERSION" > /tmp/xeno-boot-kver
 EOF
 
 KVER=$(cat "$ROOTFS/tmp/xeno-boot-kver")
 echo "Using kernel: $KVER"
 
-# ── 6. Assemble casper boot files ────────────────────────────
+# ── 7. Assemble casper boot files ────────────────────────────
 echo "Assembling bootloader files..."
 rm -rf "$WS_DIR/iso/build"/*
 mkdir -p "$WS_DIR/iso/build/casper" "$WS_DIR/iso/build/boot/grub/i386-pc"
@@ -217,6 +293,9 @@ if [ ! -f "$KERNEL_SRC" ] || [ ! -f "$INITRD_SRC" ]; then
 fi
 cp "$KERNEL_SRC" "$WS_DIR/iso/build/casper/vmlinuz"
 cp "$INITRD_SRC" "$WS_DIR/iso/build/casper/initrd"
+
+# Generate filesystem.manifest for Casper live boot validation
+chroot "$ROOTFS" dpkg-query -W --showformat='${Package} ${Version}\n' > "$WS_DIR/iso/build/casper/filesystem.manifest"
 
 cat > "$WS_DIR/iso/build/boot/grub/grub.cfg" << 'EOF'
 set timeout=5
@@ -231,58 +310,6 @@ menuentry "Xeno OS Live (Safe graphics)" {
 }
 EOF
 
-# ── 7. Sync desktop + install feature stacks if missing ──────
-echo "Syncing desktop environment and tests into rootfs..."
-rsync -a --delete \
-    --exclude='*.local' \
-    --exclude='.config/' \
-    --exclude='custom/' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='*.pyo' \
-    --exclude='.pytest_cache' \
-    --exclude='node_modules' \
-    --exclude='.git' \
-    "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
-
-rsync -a --delete \
-    --exclude='*.local' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='*.pyo' \
-    --exclude='.pytest_cache' \
-    --exclude='.git' \
-    "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
-chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/tests" 2>/dev/null || true
-
-# T9: Clean up developer history files so they do not leak into ISO
-rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
-rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
-
-
-# Ensure Windows + security tools present (idempotent)
-if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
-    if [ ! -x "$ROOTFS/usr/bin/xeno-windows" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        echo "Installing Windows compatibility stack into rootfs..."
-        bash "$WS_DIR/scripts/setup-compat-stack.sh" || echo "WARNING: compat stack setup had errors"
-    fi
-    if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        echo "Installing security/wireless tools into rootfs..."
-        bash "$WS_DIR/scripts/setup-security-tools.sh" || echo "WARNING: security tools setup had errors"
-    fi
-    if [ ! -x "$ROOTFS/usr/bin/xeno-ai-engine" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        echo "Installing AI Engine into rootfs..."
-        bash "$WS_DIR/scripts/setup-ai.sh" || echo "WARNING: AI Engine setup had errors"
-    fi
-    if [ -x "$WS_DIR/drivers/install-oot-wifi.sh" ]; then
-        echo "Installing OOT WiFi drivers into rootfs..."
-        XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh" || echo "WARNING: OOT WiFi drivers setup had errors"
-    fi
-fi
-
-# Re-assert no broken packages after feature setup
-xeno_assert_no_broken_pkgs "$ROOTFS"
-
 # ── 8. SquashFS ──────────────────────────────────────────────
 echo "Compressing root filesystem into SquashFS (ZSTD L6)..."
 rm -f "$WS_DIR/iso/build/casper/filesystem.squashfs"
@@ -291,25 +318,63 @@ mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
     -e "$ROOTFS/proc" -e "$ROOTFS/sys" -e "$ROOTFS/dev" -e "$ROOTFS/tmp" \
     -e "$ROOTFS/run" -e "$ROOTFS/var/cache/apt/archives"
 
-# ── 9. GRUB ISO (Level 3 via wrapper) ────────────────────────
+# Generate filesystem.size for Casper live boot validation
+printf $(du -sx --block-size=1 "$ROOTFS" | cut -f1) > "$WS_DIR/iso/build/casper/filesystem.size"
+
+# ── 9. GRUB ISO (Dual BIOS i386-pc + UEFI x86_64-efi via wrapper) ──
+mkdir -p "$WS_DIR/iso/build/boot/grub/i386-pc" "$WS_DIR/iso/build/boot/grub/x86_64-efi" "$WS_DIR/iso/build/EFI/BOOT"
 cp -r /usr/lib/grub/i386-pc/* "$WS_DIR/iso/build/boot/grub/i386-pc/" 2>/dev/null || true
+
 grub-mkimage -O i386-pc -o "$WS_DIR/iso/build/boot/grub/i386-pc/eltorito.img" \
     -p '(cd0)/boot/grub' iso9660 biosdisk normal
 
-echo "Generating bootable ISO..."
+# Generate standalone UEFI boot binary (BOOTX64.EFI) and FAT EFI System Partition image (efi.img)
+if [ -d "/usr/lib/grub/x86_64-efi" ]; then
+    echo "Building UEFI x86_64-efi bootloader..."
+    cp -r /usr/lib/grub/x86_64-efi/* "$WS_DIR/iso/build/boot/grub/x86_64-efi/" 2>/dev/null || true
+    
+    grub-mkimage -O x86_64-efi -o "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" \
+        -p '/boot/grub' iso9660 fat part_gpt part_msdos normal boot linux configfile tar search search_fs_file search_label search_fs_uuid efi_gop efi_uga gfxterm gfxmenu
+    
+    # Generate FAT EFI System Partition image (efi.img) for El Torito alt boot / UEFI hardware compatibility
+    dd if=/dev/zero of="$WS_DIR/iso/build/boot/grub/efi.img" bs=1k count=4096 2>/dev/null || true
+    mkfs.vfat "$WS_DIR/iso/build/boot/grub/efi.img" 2>/dev/null || true
+    if command -v mcopy >/dev/null 2>&1; then
+        mmd -i "$WS_DIR/iso/build/boot/grub/efi.img" ::EFI ::EFI/BOOT 2>/dev/null || true
+        mcopy -i "$WS_DIR/iso/build/boot/grub/efi.img" "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI 2>/dev/null || true
+    fi
+fi
+
+echo "Generating bootable ISO (${ISO_NAME})..."
 mkdir -p "$WS_DIR/iso/output"
+LOCAL_ISO_PATH="$WS_DIR/iso/output/${ISO_NAME}"
+
 grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
     -volid "$VOLUME_ID" \
-    -o "$WS_DIR/iso/output/xeno_os-4.0-alpha.iso" "$WS_DIR/iso/build/"
+    -o "$LOCAL_ISO_PATH" "$WS_DIR/iso/build/"
 
-cp "$WS_DIR/iso/output/xeno_os-4.0-alpha.iso" "$TARGET_ISO" 2>/dev/null || true
+# Generate SHA256 checksum for ISO artifact validation
+echo "Generating SHA256 checksum..."
+(cd "$WS_DIR/iso/output" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
+
+if [ "$TARGET_ISO" != "$LOCAL_ISO_PATH" ]; then
+    echo "Copying ISO to target location: $TARGET_ISO..."
+    cp "$LOCAL_ISO_PATH" "$TARGET_ISO"
+    cp "${LOCAL_ISO_PATH}.sha256" "${TARGET_ISO}.sha256" 2>/dev/null || true
+fi
 
 trap - EXIT
 xeno_chroot_umount "$ROOTFS"
 
+# Auto-increment version by +0.5 for the next build
+NEXT_VERSION=$(python3 -c "print(round($BUILD_VERSION + 0.5, 1))")
+echo "$NEXT_VERSION" > "$VERSION_FILE"
+
 echo "=== AUTOMATED PIPELINE COMPLETE ==="
 echo "ISO: $TARGET_ISO"
+echo "SHA256: $(cat "${LOCAL_ISO_PATH}.sha256" | awk '{print $1}')"
 echo "Boot kernel: $KVER"
+echo "Next build version queued: v${NEXT_VERSION}"
 if [ "$KERNEL_VALID" != "1" ]; then
     echo "NOTE: Custom Xeno kernel was INVALID — ISO used fallback generic kernel."
     echo "      Rebuild kernel CI to restore XanMod + injection + full WLAN."

@@ -15,6 +15,9 @@ for arg in "$@"; do
         args+=("-iso-level" "3")
     fi
 done
+# Log exact arguments passed to xorriso for empirical inspection
+printf '%s\n' "${args[@]}" > /tmp/xorriso-args.log 2>/dev/null || true
+
 # Pass the modified arguments to the real xorriso
 exec /usr/bin/xorriso "${args[@]}"
 

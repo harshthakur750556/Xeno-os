@@ -111,10 +111,10 @@ echo "--- Configuring kernel ---"
 # Prefer XanMod's own recommended config when present
 BASE_CFG=""
 for candidate in \
-    CONFIGS/xanmod/gcc/config_x86-64-v3 \
     CONFIGS/xanmod/gcc/config_x86-64 \
     CONFIGS/xanmod/gcc/config \
-    arch/x86/configs/xanmod_defconfig
+    arch/x86/configs/xanmod_defconfig \
+    CONFIGS/xanmod/gcc/config_x86-64-v3
 do
     if [ -f "$candidate" ]; then
         BASE_CFG="$candidate"
