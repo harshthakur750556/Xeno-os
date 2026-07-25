@@ -16,7 +16,10 @@ xeno_chroot_mount() {
     local ROOTFS="$1"
     mountpoint -q "$ROOTFS/proc" 2>/dev/null || mount --bind /proc "$ROOTFS/proc"
     mountpoint -q "$ROOTFS/sys" 2>/dev/null || mount --bind /sys "$ROOTFS/sys"
-    mountpoint -q "$ROOTFS/dev" 2>/dev/null || mount --rbind /dev "$ROOTFS/dev"
+    mountpoint -q "$ROOTFS/dev" 2>/dev/null || {
+        mount --bind /dev "$ROOTFS/dev"
+        mount --make-rslave "$ROOTFS/dev" 2>/dev/null || true
+    }
     if [ -d /dev/pts ]; then
         mkdir -p "$ROOTFS/dev/pts"
         mountpoint -q "$ROOTFS/dev/pts" 2>/dev/null || mount --bind /dev/pts "$ROOTFS/dev/pts" 2>/dev/null || true
@@ -37,7 +40,7 @@ xeno_chroot_umount() {
     local ROOTFS="$1"
     umount -l "$ROOTFS/run" 2>/dev/null || true
     umount -l "$ROOTFS/dev/pts" 2>/dev/null || true
-    umount -lR "$ROOTFS/dev" 2>/dev/null || true
+    umount -l "$ROOTFS/dev" 2>/dev/null || true
     umount -l "$ROOTFS/sys" 2>/dev/null || true
     umount -l "$ROOTFS/proc" 2>/dev/null || true
 }

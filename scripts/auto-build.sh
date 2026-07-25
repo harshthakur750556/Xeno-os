@@ -186,7 +186,7 @@ if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
         shift
         echo "Installing ${step_name} into rootfs..."
         if ! "$@"; then
-            if [ "${XENO_STRICT_BUILD:-0}" = "1" ]; then
+            if [ "${XENO_STRICT_BUILD:-1}" = "1" ]; then
                 echo "FATAL: ${step_name} failed under XENO_STRICT_BUILD=1"
                 exit 1
             else
@@ -359,7 +359,12 @@ echo "Generating SHA256 checksum..."
 
 if [ "$TARGET_ISO" != "$LOCAL_ISO_PATH" ]; then
     echo "Copying ISO to target location: $TARGET_ISO..."
-    cp "$LOCAL_ISO_PATH" "$TARGET_ISO"
+    if ! cp "$LOCAL_ISO_PATH" "$TARGET_ISO" 2>/dev/null; then
+        echo "Standard cp failed (likely WSL /mnt 9P memory limit) — attempting chunked dd copy..."
+        dd if="$LOCAL_ISO_PATH" of="$TARGET_ISO" bs=64M status=progress conv=fsync || {
+            echo "WARNING: Could not copy ISO to $TARGET_ISO. Local copy remains safe at $LOCAL_ISO_PATH."
+        }
+    fi
     cp "${LOCAL_ISO_PATH}.sha256" "${TARGET_ISO}.sha256" 2>/dev/null || true
 fi
 
