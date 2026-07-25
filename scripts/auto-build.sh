@@ -5,9 +5,15 @@
 set -euo pipefail
 
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET_ISO="/mnt/c/Users/harsh/xeno_os-3.0-alpha.iso"
+TARGET_ISO="/mnt/c/Users/harsh/xeno_os-4.0-alpha.iso"
 if [ ! -d "/mnt/c/Users/harsh" ]; then
-    TARGET_ISO="$WS_DIR/iso/output/xeno_os-3.0-alpha.iso"
+    TARGET_ISO="$WS_DIR/iso/output/xeno_os-4.0-alpha.iso"
+fi
+
+# Clean up all older ISO versions (v1, v2, v3, etc.)
+find "$WS_DIR/iso/output" -name "xeno_os*.iso" ! -name "xeno_os-4.0-alpha.iso" -delete 2>/dev/null || true
+if [ -d "/mnt/c/Users/harsh" ]; then
+    find /mnt/c/Users/harsh -maxdepth 1 -name "xeno_os*.iso" ! -name "xeno_os-4.0-alpha.iso" -delete 2>/dev/null || true
 fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
@@ -81,6 +87,7 @@ fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
     echo "Downloading kernel packages from GitHub Release..."
+    rm -f "$CACHE_DIR"/*.deb
     if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber 2>/dev/null; then
         if [ -n "$RELEASE_INFO" ]; then
             echo "$RELEASE_INFO" > "$META_FILE"
@@ -155,7 +162,7 @@ apt-get purge -y snapd apport whoopsie cups geoclue-2.0 2>/dev/null || true
 apt-get autoremove -y 2>/dev/null || true
 
 mkdir -p /etc/initramfs-tools
-for m in overlay squashfs zstd; do
+for m in overlay squashfs zstd nls_utf8 isofs sr_mod sd_mod ahci; do
     grep -qxF "$m" /etc/initramfs-tools/modules 2>/dev/null || echo "$m" >> /etc/initramfs-tools/modules
 done
 
@@ -175,9 +182,8 @@ if [ -z "$KIMG" ]; then
 fi
 NEW_VERSION="${KIMG#/boot/vmlinuz-}"
 echo "Boot kernel version: $NEW_VERSION"
-if [ ! -f "/boot/initrd.img-$NEW_VERSION" ]; then
-    update-initramfs -c -k "$NEW_VERSION" || update-initramfs -u -k "$NEW_VERSION"
-fi
+echo "Regenerating initramfs with casper live boot modules for $NEW_VERSION..."
+update-initramfs -u -k "$NEW_VERSION" || update-initramfs -c -k "$NEW_VERSION"
 # Reject broken package state
 bad=$(dpkg -l | awk '$1 ~ /U|H|R|F/ {print $2}')
 if [ -n "$bad" ]; then
@@ -294,9 +300,9 @@ echo "Generating bootable ISO..."
 mkdir -p "$WS_DIR/iso/output"
 grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
     -volid "$VOLUME_ID" \
-    -o "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$WS_DIR/iso/build/"
+    -o "$WS_DIR/iso/output/xeno_os-4.0-alpha.iso" "$WS_DIR/iso/build/"
 
-cp "$WS_DIR/iso/output/xeno_os-3.0-alpha.iso" "$TARGET_ISO" 2>/dev/null || true
+cp "$WS_DIR/iso/output/xeno_os-4.0-alpha.iso" "$TARGET_ISO" 2>/dev/null || true
 
 trap - EXIT
 xeno_chroot_umount "$ROOTFS"

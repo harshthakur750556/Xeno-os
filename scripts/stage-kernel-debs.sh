@@ -21,6 +21,7 @@ bash "$WS_DIR/kernel/validate-kernel-deb.sh" "$OUT_DIR"
 
 mkdir -p "$CACHE_DIR"
 echo "Staging kernel packages from $OUT_DIR to $CACHE_DIR..."
+rm -f "$CACHE_DIR"/*.deb
 cp "$OUT_DIR"/*.deb "$CACHE_DIR/"
 
 cat > "$META_FILE" << EOF

@@ -75,8 +75,10 @@ apt-get -f install -y 2>/dev/null || true
 
 # Ensure a working Ubuntu generic kernel remains
 echo "[3/5] Ensuring Ubuntu generic kernel is present..."
+apt-get update -y || true
 apt-get install -y --reinstall linux-image-generic linux-headers-generic linux-modules-generic 2>/dev/null \
-    || apt-get install -y linux-image-generic linux-headers-generic
+    || apt-get install -y linux-image-generic linux-headers-generic \
+    || echo "Notice: Generic kernel update skipped; existing kernel or custom Xeno kernel will be used."
 
 # Make sure generic kernel is the default symlink target
 GEN=$(ls /boot/vmlinuz-*-generic 2>/dev/null | sort -V | tail -1 || true)
