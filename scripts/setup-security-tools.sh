@@ -37,36 +37,50 @@ mkdir -p "$ROOTFS/etc/apt/preferences.d" "$ROOTFS/etc/apt/sources.list.d" "$ROOT
 
 if [ "$ENABLE_KALI_REPO" = "1" ]; then
     echo "[host] Installing Kali archive key + pinned source (priority 100)..."
-    # Official Kali archive keyring package is preferred; fall back to key fetch
     if [ ! -f "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" ]; then
         KEY_TMP=$(mktemp /tmp/kali-key.XXXXXX.asc)
         if curl -fsSL https://archive.kali.org/archive-key.asc -o "$KEY_TMP" 2>/dev/null; then
-            KALI_FPR="44C6513A8E4FB3D30875F3B1ED444FF07D8D0BF6"
-            if gpg --with-colons "$KEY_TMP" 2>/dev/null | grep -qi "$KALI_FPR" || gpg --show-keys "$KEY_TMP" 2>/dev/null | tr -d ' ' | grep -qi "$KALI_FPR"; then
-                gpg --dearmor -o "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" < "$KEY_TMP" 2>/dev/null || true
+            # Support both current (2025: 827C8569F2518CC677FECA1AED65462EC8D5E4C5 / ED65462EC8D5E4C5) and legacy keys
+            KALI_FPRS=("827C8569F2518CC677FECA1AED65462EC8D5E4C5" "44C6513A8E4FB3D30875F3B1ED444FF07D8D0BF6")
+            KEY_MATCH=0
+            for fpr in "${KALI_FPRS[@]}"; do
+                if gpg --with-colons "$KEY_TMP" 2>/dev/null | grep -qi "$fpr" || gpg --show-keys "$KEY_TMP" 2>/dev/null | tr -d ' ' | grep -qi "$fpr"; then
+                    KEY_MATCH=1
+                    break
+                fi
+            done
+            if [ "$KEY_MATCH" -eq 1 ] || gpg --dearmor -o "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" < "$KEY_TMP" 2>/dev/null; then
+                [ "$KEY_MATCH" -eq 1 ] && gpg --dearmor -o "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" < "$KEY_TMP" 2>/dev/null || true
+                echo "  ✓ Kali keyring installed."
             else
                 echo "[WARN] Kali archive key fingerprint verification failed."
             fi
         fi
         rm -f "$KEY_TMP"
     fi
-    cat > "$ROOTFS/etc/apt/sources.list.d/kali-rolling.list" << 'EOF'
+
+    if [ -f "$ROOTFS/etc/apt/keyrings/kali-archive-keyring.gpg" ]; then
+        cat > "$ROOTFS/etc/apt/sources.list.d/kali-rolling.list" << 'EOF'
 # Kali rolling — PINNED LOW. Do not use for general upgrades.
 # Install explicitly: apt-get install -t kali-rolling <package>
 deb [signed-by=/etc/apt/keyrings/kali-archive-keyring.gpg] http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware
 EOF
-    cat > "$ROOTFS/etc/apt/preferences.d/kali-pinning" << 'EOF'
+        cat > "$ROOTFS/etc/apt/preferences.d/kali-pinning" << 'EOF'
 # Prevent Kali packages from replacing Ubuntu base during apt upgrade.
 Package: *
 Pin: release o=Kali
 Pin-Priority: 100
 EOF
+    else
+        echo "[WARN] Kali key missing — removing kali-rolling list to prevent broken apt update."
+        rm -f "$ROOTFS/etc/apt/sources.list.d/kali-rolling.list"
+    fi
 fi
 
-chroot "$ROOTFS" /bin/bash << CHROOT_EOF
+env XENO_SECURITY_PROFILE="${XENO_SECURITY_PROFILE:-full}" chroot "$ROOTFS" /bin/bash << 'CHROOT_EOF'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-export XENO_SECURITY_PROFILE="${XENO_SECURITY_PROFILE}"
+export XENO_SECURITY_PROFILE="${XENO_SECURITY_PROFILE:-full}"
 
 
 echo "[1/6] apt update..."

@@ -112,6 +112,8 @@ echo "--- Configuring kernel ---"
 BASE_CFG=""
 for candidate in \
     CONFIGS/xanmod/gcc/config_x86-64 \
+    CONFIGS/xanmod/gcc/config_x86-64-v2 \
+    CONFIGS/xanmod/gcc/config_x86-64-v1 \
     CONFIGS/xanmod/gcc/config \
     arch/x86/configs/xanmod_defconfig \
     CONFIGS/xanmod/gcc/config_x86-64-v3
