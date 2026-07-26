@@ -298,14 +298,18 @@ cp "$INITRD_SRC" "$WS_DIR/iso/build/casper/initrd"
 chroot "$ROOTFS" dpkg-query -W --showformat='${Package} ${Version}\n' > "$WS_DIR/iso/build/casper/filesystem.manifest"
 
 cat > "$WS_DIR/iso/build/boot/grub/grub.cfg" << 'EOF'
+serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
+terminal_input serial console
+terminal_output serial console
+
 set timeout=5
 set default=0
 menuentry "Xeno OS Live (Wayland - Universal)" {
-    linux /casper/vmlinuz boot=casper quiet splash username=xeno hostname=xeno-os ---
+    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 quiet splash username=xeno hostname=xeno-os ---
     initrd /casper/initrd
 }
 menuentry "Xeno OS Live (Safe graphics)" {
-    linux /casper/vmlinuz boot=casper quiet splash username=xeno hostname=xeno-os xeno.safegraphics=1 ---
+    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 quiet splash username=xeno hostname=xeno-os xeno.safegraphics=1 ---
     initrd /casper/initrd
 }
 EOF
