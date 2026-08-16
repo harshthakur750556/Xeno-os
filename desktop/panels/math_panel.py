@@ -67,8 +67,12 @@ class MathWorker(BaseWorker):
             
             # Format outputs as LaTeX string
             if isinstance(result_expr, list):
-                latex_str = ", ".join([sp.latex(r) for r in result_expr])
-                plain_str = ", ".join([str(r) for r in result_expr])
+                if len(result_expr) == 0:
+                    latex_str = r"\emptyset"
+                    plain_str = "No solution"
+                else:
+                    latex_str = ", ".join([sp.latex(r) for r in result_expr])
+                    plain_str = ", ".join([str(r) for r in result_expr])
             else:
                 latex_str = sp.latex(result_expr)
                 plain_str = str(result_expr)

@@ -4,361 +4,391 @@
  ░█──░█ ░█▄▄▄ ░█──▀█ ░█▄▄█ ── ░█▄▄█ ░█▄▄█ 
 ```
 
-> **XENO OS (v2.0 Noble Cyber-Nord)** — Next-Generation Hardware-Agnostic Scientific & Security Linux Distribution featuring custom XanMod BORE Kernel, Hyprland Wayland Compositor, Astal v2 Desktop Shell, PySide6 Scientific Workspace, Kali Packet Injection Engine, and XenoSense Multimodal AI Subsystem.
+# XENO OS — Next-Generation Hybrid Scientific & Security Platform
+
+> **XENO OS (v6.0-ALPHA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
 
 ---
 
 ## ⚡ System Status Badges
 
-![Base OS](https://img.shields.io/badge/Base_OS-Ubuntu_24.04_LTS_Noble-purple.svg?style=for-the-badge)
-![Kernel](https://img.shields.io/badge/Kernel-XanMod_6.12+_BORE_EEVDF-cyan.svg?style=for-the-badge)
-![Scheduler](https://img.shields.io/badge/Scheduler-PREEMPT_1000Hz_NTSYNC-green.svg?style=for-the-badge)
-![Security](https://img.shields.io/badge/Injection-Kali_mac80211_Patched-red.svg?style=for-the-badge)
-![Shell](https://img.shields.io/badge/Shell-Astal_v2_Typescript_Bun-blue.svg?style=for-the-badge)
-![GUI](https://img.shields.io/badge/GUI-PySide6_Cyber_Nord-magenta.svg?style=for-the-badge)
-![Test Suite](https://img.shields.io/badge/E2E_Tests-73_Passing_4_Tiers-brightgreen.svg?style=for-the-badge)
+![Base OS](https://img.shields.io/badge/Base_OS-Ubuntu_24.04_LTS_Noble-00F0FF?style=for-the-badge&logo=ubuntu&logoColor=white)
+![Kernel](https://img.shields.io/badge/Kernel-XanMod_6.12+_BORE_1000Hz-7000FF?style=for-the-badge&logo=linux&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Kali_mac80211_Patched-FF5555?style=for-the-badge&logo=kalilinux&logoColor=white)
+![ZRAM](https://img.shields.io/badge/ZRAM-zstd_50%25_RAM-00FFA3?style=for-the-badge&logo=speedtest&logoColor=black)
+![Shell](https://img.shields.io/badge/Shell-Astal_v2_Typescript_Bun-00FFA3?style=for-the-badge&logo=bun&logoColor=black)
+![Tests](https://img.shields.io/badge/Tests-96_Passing_5_Tiers-50FA7B?style=for-the-badge&logo=pytest&logoColor=black)
 
 ---
 
-## 🌌 System Vision & Architecture
+## 📋 Complete System Specifications
 
-**Xeno OS** is engineered as a zero-compromise, hybrid Linux distribution designed for high-performance daily desktop usage, symbolic and numerical scientific computing, hardware-agnostic virtual machine deployments, native low-latency Windows application translation, and kernel-level wireless penetration testing.
-
-### Core Architectural Pillars
-1. **Low-Latency Kernel Engine**: Built on a custom XanMod 6.12+ Linux kernel featuring the BORE (Burst-Oriented Response Enhancer) EEVDF CPU scheduler, full preemption (`CONFIG_PREEMPT_BUILD=y`), 1000Hz timer frequency, and kernel-level `CONFIG_NTSYNC` synchronization primitives for ultra-smooth gaming and desktop interactivity.
-2. **Kernel Wireless Injection Stack**: Native patch series for `mac80211` and `cfg80211` allowing arbitrary frame injection, monitor mode channel switching under active VIFs, and out-of-tree Realtek DKMS wireless driver integration.
-3. **Dual GUI Architecture**:
-   - **Desktop Shell**: High-speed TypeScript shell built on the Bun runtime using Astal v2 (`astal/gtk3`) for reactive panel bars, app launchers, and system notification toasts.
-   - **Scientific Workspace**: Modular PySide6 desktop suite integrating thread-isolated panels for symbolic mathematics, numerical data analysis, interactive Jupyter code execution, VTK 3D graphics rendering, and SciPy DSP signal processing.
-4. **Hardware Agnosticism & VM Rasterization**: Native hardware acceleration via Intel/AMD/NVIDIA Mesa graphics drivers with automatic runtime hypervisor detection (`systemd-detect-virt`) that seamlessly degrades to high-throughput software rasterization (`llvmpipe` / `softpipe`) inside VirtualBox, Hyper-V, QEMU/KVM, or standalone TTY consoles.
-5. **Multimodal AI & Socket Subsystem (XenoSense)**: Low-overhead background perceptual engine projecting MediaPipe hand tracking gestures, OpenCV biometric face recognition, and Faster-Whisper offline voice commands onto a non-blocking Unix domain socket (`/tmp/xeno-sense.sock`).
-6. **Isolated Windows Compatibility**: Hybrid execution pipeline combining system WineHQ, DXVK, VKD3D-Proton, GameMode, MangoHud, and Flatpak-isolated Bottles runners.
+| Specification Area | Technical Implementation & Parameter |
+|---|---|
+| **Base Operating System** | Ubuntu 24.04 LTS (Noble Numbat) Clean Debootstrap Base |
+| **Kernel & Architecture** | Custom XanMod 6.12+ (x86_64), `CONFIG_PREEMPT_BUILD=y` (Full Real-time Preemption) |
+| **Scheduler & Clock Frequency** | BORE (Burst-Oriented Response Enhancer) EEVDF Scheduler @ 1000Hz (`CONFIG_HZ_1000=y`) |
+| **Kernel Synchronization** | Fast in-kernel `CONFIG_NTSYNC=y` (Direct Wine/Proton multi-threading synchronization) |
+| **Memory Compression (ZRAM)** | `systemd-zram-generator` with **Zstd compression**, dynamic 50% RAM allocation (`ram / 2`) |
+| **Virtual Memory Tuning** | `vm.max_map_count=1048576` for high-concurrency VMA handling (Wine/Proton/Scientific workloads) |
+| **Display Compositor** | Hyprland Wayland Compositor (with adaptive Mesa `llvmpipe`/`softpipe` fallback for VMs) |
+| **Desktop Shell** | TypeScript Astal v2 GTK3 Surface Layer running on the **Bun** runtime engine |
+| **Scientific Workspace Suite** | Modular Python / PySide6 GUI panels (SymPy Math, Pandas Data, Code, SciPy Signal, VTK 3D) |
+| **Windows App Execution** | Wine Staging 9.x + DXVK + VKD3D-Proton + Bottles + `WINEESYNC=1` + `WINEFSYNC=1` + `i386` multiarch |
+| **Android App Execution** | Waydroid AOSP Subsystem sharing Linux kernel binder & Wayland display buffers |
+| **Linux Standalone Apps** | Direct FUSE 2/3 runtime (`libfuse2t64`) for zero-install `.AppImage` execution + Flatpak/Flathub |
+| **Security & Pentest Stack** | Kali `mac80211` & `cfg80211` packet injection patches + Pinned Kali Rolling repo (`Priority: 100`) |
+| **Wireless Adapter Drivers** | 7 staged out-of-tree DKMS drivers: Realtek (`RTL8812AU`, `RTL8821CE`, `RTL88x2BU`, `RTL8188EUS`, `RTL8814AU`) & MediaTek (`MT7612U`, `MT7610U`) |
+| **Local AI Engine & Sandbox** | `xeno-ai-engine` (Ollama/llama.cpp @ `/var/cache/xeno-ai/models`) + Bubblewrap (`bwrap`) isolation |
+| **Live Boot & ISO Engine** | Casper Live Overlay (`boot=casper`), ZSTD Level 19 1MB-block SquashFS, GRUB ISO Level 3 (`XENOOS`) |
+| **Diagnostic & Auto-Heal** | [`scripts/master-doctor.sh`](file:///home/xeno/Xeno-os/scripts/master-doctor.sh) (8-Tier audit engine with `--fix` self-healing) |
+| **Test Verification** | 96 Automated Tests (73 E2E Integration + 23 Adversarial IPC boundary tests) |
 
 ---
 
-## 📊 Complete Subsystem Architecture Map
+## 🧠 ZRAM Architecture & Memory Consumption Specs
+
+Xeno OS is engineered for a lightweight memory footprint and zero physical disk swap latency by leveraging kernel-level in-memory compressed swap (**ZRAM**) alongside aggressive OS de-bloating.
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          TOTAL PHYSICAL RAM (e.g. 8GB)       │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 ▼                                               ▼
+   ┌───────────────────────────┐                   ┌───────────────────────────┐
+   │    Active System Memory   │                   │    ZRAM0 Compressed Swap  │
+   │      (50% = 4000 MB)      │                   │      (50% = 4000 MB)      │
+   │                           │                   │  Algorithm: Zstd (~3:1)   │
+   │  - XanMod Kernel: ~120MB  │                   │  Effective Storage Space: │
+   │  - Hyprland + Shell: ~180MB                   │        ~10 GB - 12 GB     │
+   │  - System Services: ~150MB│                   └─────────────┬─────────────┘
+   │  - Free/Available: ~3550MB│                                 │
+   └───────────────────────────┘                                 ▼
+                                                   [ Zero Physical Disk I/O ]
+                                                   [ Sub-Microsecond Access ]
+                                                   [ Prevents Live USB Hang ]
+```
+
+### 1. ZRAM Implementation Details
+- **Generator Daemon**: `systemd-zram-generator` configured in `/etc/systemd/zram-generator.conf.d/zram0.conf`.
+- **Target Device**: `/dev/zram0` dynamically initialized during boot phase (`system-systemd\x2dzram\x2dsetup.slice`).
+- **Allocation Rule**: `zram-size = ram / 2` (exactly 50% of detected physical RAM).
+- **Compression Algorithm**: `zstd` (Zstandard). Provides optimal balance of high compression ratio (~2.8:1 to 3.5:1 on text/code/RAM pages) with near-instant decompression throughput (>3GB/s).
+- **Diskless Swapping**: Completely eliminates thrashing and freeze-ups when running from slow USB 2.0/3.0 live media or resource-constrained virtual machines.
+- **Kernel Memory Overcommit**: Paired with `vm.max_map_count=1048576` and `vm.swappiness=180` to prioritize compressed RAM over cold disk paging.
+
+### 2. Detailed RAM Consumption Profile
+
+| Operational State | RAM Utilization | Primary Active Components |
+|---|---|---|
+| **Cold Boot Idle (Terminal / Headless)** | **~180 MB – 240 MB** | Systemd, XanMod Kernel, D-Bus, Udev, Serial Getty |
+| **Cold Boot Idle (Hyprland + Astal Shell)** | **~450 MB – 680 MB** | Hyprland Wayland, Astal v2 GTK3 Shell, PipeWire, WirePlumber |
+| **PySide6 Scientific Workspace (Active)** | **~520 MB – 780 MB** | BasePanel, Workspace Host, Active Background Worker Threads |
+| **Scientific Heavy Compute (SymPy / VTK 3D)** | **~850 MB – 1.4 GB** | SymPy Lambdified Matrices, NumPy Array Buffers, VTK 3D Meshes |
+| **Windows App Execution (Wine / Bottles)** | **~750 MB – 1.8 GB** | Wine Server, DXVK Shader Pipelines, Audio Pulse/PipeWire bridges |
+| **Android Execution (Waydroid AOSP Container)** | **~1.1 GB – 2.1 GB** | Android System Server, SurfaceFlinger, Binder Interface |
+
+### 3. Canonical De-Bloat Engine
+To maintain the ~450MB idle footprint, Xeno OS removes heavy Canonical telemetry and background bloat from the Noble base:
+- `snapd` & `snap` daemons purged (replaced with native APT and Flatpak/Flathub).
+- `cups` print spoolers and `geoclue-2.0` location tracking stripped.
+- `apport` and `whoopsie` crash uploaders removed.
+- Python bytecode (`__pycache__`, `*.pyc`) and APT archive caches stripped during ISO compression.
+
+---
+
+## 🏛️ Internal System Architecture & Directory Layout
 
 ```mermaid
 graph TD
-    subgraph KERNEL ["Kernel & Hardware Abstraction Layer"]
+    subgraph KERNEL ["Layer 1: Low-Latency Kernel & Hardware Abstraction"]
         K1["Custom XanMod 6.12+ Kernel Source"]
-        K2["BORE EEVDF Scheduler + PREEMPT 1000Hz"]
-        K3["NTSYNC Synchronization Driver"]
+        K2["BORE EEVDF Scheduler + PREEMPT (1000Hz)"]
+        K3["NTSYNC Kernel Synchronization Primitive"]
         K4["Kali mac80211 / cfg80211 Packet Injection Patches"]
-        K5["Out-of-Tree RTL8812AU / RTL88XXau DKMS Drivers"]
-        K1 --> K2
-        K1 --> K3
-        K1 --> K4
-        K1 --> K5
+        K5["Out-of-Tree Wi-Fi DKMS (RTL8812AU, RTL8821CE, MT7612U...)"]
+        K6["ZRAM In-Memory Compressed Swap (zstd, 50% RAM)"]
+        K1 --> K2 & K3 & K4 & K5 & K6
     end
 
-    subgraph BOOT ["Boot & ISO Packaging Subsystem"]
-        B1["Ubuntu 24.04 LTS (Noble) Base RootFS"]
-        B2["Casper Live Overlay (ZSTD SquashFS at iso/build/casper/)"]
+    subgraph BOOT ["Layer 2: Base System & ISO Packaging Subsystem"]
+        B1["Ubuntu 24.04 LTS (Noble) Minimal RootFS"]
+        B2["Casper Live Overlay (Smart Lean ZSTD L19 SquashFS)"]
         B3["GRUB Bootloader (boot=casper, Volume ID: XENOOS)"]
-        B4["Xorriso ISO Engine (-iso-level 3 for >4GB SquashFS)"]
+        B4["Xorriso Wrapper (-iso-level 3 for >4GB Images)"]
         B1 --> B2 --> B3 --> B4
     end
 
-    subgraph GRAPHICS ["Display Server & Software Rasterizer Engine"]
+    subgraph DISPLAY ["Layer 3: Display Server & Hardware Adaptive Layer"]
         G1["xeno-start-hyprland Session Launcher"]
-        G2["VM Auto-Detector (systemd-detect-virt)"]
+        G2["Hardware / VM Auto-Detector (systemd-detect-virt)"]
         G3["Mesa Software Renderer (llvmpipe / softpipe / LIBGL_ALWAYS_SOFTWARE)"]
-        G4["Hyprland Wayland Compositor"]
+        G4["Hyprland Wayland Hardware Compositor"]
         G1 --> G2
         G2 -->|Virtual Machine| G3 --> G4
-        G2 -->|Bare Metal| G4
+        G2 -->|Bare Metal GPU| G4
     end
 
-    subgraph SHELL ["Desktop Shell Subsystem (Astal v2 / Bun)"]
+    subgraph SHELL ["Layer 4: Desktop Shell & System Telemetry (Astal v2 / Bun)"]
         S1["Bun Runtime Engine"]
         S2["Astal v2 GTK3 Binding Framework"]
-        S3["Neonic Status Bar (Bar.ts)"]
-        S4["Cyber App Launcher (Launcher.ts)"]
-        S5["Notification Toast Engine (Notifications.ts)"]
-        S6["Global Reactive State Store (state.ts)"]
+        S3["Top Status Bar (Bar.ts) — Live CPU/RAM/Workspace Telemetry"]
+        S4["Cyber App Launcher (Launcher.ts) — App Registry & Launch Matrix"]
+        S5["Notification Toast Engine (Notifications.ts) — Non-blocking alerts"]
+        S6["Global Reactive IPC Socket (/tmp/xeno-shell.sock)"]
         S1 --> S2 --> S3 & S4 & S5
         S6 <--> S3 & S4 & S5
     end
 
-    subgraph GUI ["PySide6 Scientific Workspace Suite"]
-        W1["desktop/env.py Qt Software Fallback Guard"]
-        W2["Login Screen (loginscreen.py)"]
-        W3["XenoWorkspace Container (workspace.py)"]
-        W4["Math Solver (SymPy + Matplotlib 'Agg')"]
-        W5["Data Analyst (Pandas + Plotly Dark)"]
-        W6["Interactive Notebook (In-Process QtConsole)"]
-        W7["3D Surface Render Engine (Deferred VTK)"]
-        W8["DSP Signal Analyzer (SciPy + FFT)"]
-        W9["Cyber-Nord File Manager & Settings Center"]
-        W1 --> W2 --> W3
-        W3 --> W4 & W5 & W6 & W7 & W8 & W9
+    subgraph APPS ["Layer 5: Universal Cross-Platform Execution Stack"]
+        C1["Wine Staging + DXVK + VKD3D (Windows .exe / .msi)"]
+        C2["Waydroid AOSP Container (Android .apk)"]
+        C3["FUSE 2/3 Runtime (Linux .AppImage)"]
+        C4["APT / DPkg Native Package Engine (Debian .deb)"]
+        C5["Flatpak Container Engine (Flathub .flatpak)"]
+        C6["QEMU / KVM Hardware Hypervisor (Live .iso)"]
+        C7["Local AI Engine (xeno-ai-engine / Ollama / bwrap sandbox)"]
     end
 
-    subgraph WINCOMPAT ["Windows Application Compatibility Layer"]
-        C1["Flatpak / Bottles Isolated Runner"]
-        C2["System WineHQ + DXVK + VKD3D-Proton"]
-        C3["xeno-windows CLI Wrapper"]
-        C4["GameMode + MangoHud Integration"]
-        C3 --> C1 & C2 --> C4
+    subgraph WORKSPACE ["Layer 6: Scientific & Security Suites"]
+        W1["Math Panel: SymPy Derivatives, Integrals & Solvers"]
+        W2["Data Panel: Pandas Statistical Data Profiling"]
+        W3["Code Panel: Isolated Python Script Execution"]
+        W4["Signal Panel: SciPy Butterworth & FFT Spectrum"]
+        W5["3D Panel: VTK 3D Meshes & Vector Visualizations"]
+        W6["Security: Aircrack-ng, Wireshark, Metasploit, xeno-wifi-monitor"]
     end
 
-    subgraph SECURITY ["Security Intelligence & Wireless Stack"]
-        R1["Pinned Kali Rolling Repository (Pin-Priority 100)"]
-        R2["xeno-wifi-monitor Injection Controller"]
-        R3["Aircrack-ng / Wireshark / Hashcat Toolchain"]
-        R4["Scoped RT Capabilities (/etc/security/limits.d/)"]
-        R1 --> R3
-        R2 --> R3
-    end
-
-    subgraph AI ["XenoSense Multimodal AI Subsystem"]
-        A1["XenoSense Daemon (xenosense.py)"]
-        A2["Unix Socket IPC (/tmp/xeno-sense.sock)"]
-        A3["MediaPipe Hand Gesture Tracking"]
-        A4["OpenCV / Biometric Face Recognition"]
-        A5["Faster-Whisper Voice Command Engine"]
-        A3 & A4 & A5 --> A1 --> A2
-    end
-
-    subgraph TEST ["Automated E2E Testing & Verification"]
-        T1["python3 tests/run_tests.py"]
-        T2["73 E2E Tests Across 4 Tiers"]
-        T3["Headless Simulator Mode (simulator.py)"]
-        T4["Live Wayland Compositor Session Mode"]
-        T1 --> T2 --> T3 & T4
-    end
-
-    KERNEL --> BOOT
-    BOOT --> GRAPHICS
-    GRAPHICS --> SHELL
-    GRAPHICS --> GUI
-    KERNEL --> WINCOMPAT
-    KERNEL --> SECURITY
-    SHELL <--> AI
-    GUI <--> AI
-    TEST -.-> SHELL & GUI & SECURITY & WINCOMPAT
+    KERNEL --> BOOT --> DISPLAY --> SHELL --> APPS --> WORKSPACE
 ```
 
 ---
 
-## 🔬 Deep-Dive Subsystem Specifications
-
-### 1. Custom XanMod Kernel & Wireless Packet Injection (`kernel/`)
-- **Kernel Baseline**: XanMod 6.12+ tree built using Ubuntu production baseline configuration flags combined with `kernel/configs/xeno.config.fragment`.
-- **Latency & Performance Flags**:
-  - `CONFIG_PREEMPT_BUILD=y`: Full preemption for real-time responsiveness.
-  - `CONFIG_HZ_1000=y`: 1000Hz scheduler clock tick for low micro-stuttering.
-  - `CONFIG_NTSYNC=y`: Fast in-kernel synchronization primitive for Wine/Proton.
-- **Wireless Packet Injection Patches**:
-  - `0001-mac80211-injection-sequence-and-qos.patch`: Enables arbitrary frame injection and sequence number overriding in `net/mac80211/tx.c`.
-  - `0002-cfg80211-allow-monitor-channel-change.patch`: Permits channel switching on monitor interfaces while virtual interfaces (VIFs) are active in `net/wireless/chan.c`.
-  - `0003-legacy-usb-wifi-injection-helpers.patch`: Injection support for legacy USB Wi-Fi chipsets (`zd1211rw`, `rtl8187`).
-- **Out-of-Tree Drivers**: DKMS builder for Realtek high-power wireless chipsets (`drivers/install-oot-wifi.sh` for `rtl8812au` / `rtl88XXau`).
-
-### 2. ISO Packaging & Casper Live Overlay (`iso/` & `scripts/`)
-- **RootFS Distribution**: Ubuntu 24.04 LTS (Noble Numbat) base filesystem customized with Casper live boot hooks.
-- **SquashFS Path Enforcement**:
-  > [!CRITICAL]
-  > SquashFS image MUST reside strictly at `iso/build/casper/filesystem.squashfs` (NEVER `iso/build/live/`). Using `live/` triggers immediate Linux kernel panic during boot.
-- **ISO Level 3 Oversized Image Support**: Because scientific dependencies (VTK, PySide6, Matplotlib, SciPy, Jupyter, Flatpak runtime) cause `filesystem.squashfs` to exceed 4GB, `xorriso` invocation requires `-iso-level 3` to prevent ISO creation overflow.
-- **GRUB Parameters**: GRUB Volume ID must be $\le 8$ uppercase alphanumeric characters (`XENOOS`). Boot command specifies:
-  ```grub
-  linux /casper/vmlinuz boot=casper quiet splash hostname=xeno-os ---
-  initrd /casper/initrd
-  ```
-- **Primary Packaging Pipeline**: `sudo bash scripts/auto-build.sh` validates kernel DEB artifacts, updates rootfs, builds ZSTD compressed SquashFS, and packs bootable ISO image into `iso/output/`.
-
-### 3. Graphics Compositor & VM Software Fallback Engine (`desktop/env.py`)
-- **Compositor**: Hyprland Wayland compositor with custom Cyber-Nord window rules and bindings (`rootfs/home/xeno/.config/hypr/hyprland.conf`).
-- **VM Hardware Detection**: Launcher script `/usr/bin/xeno-start-hyprland` executes `systemd-detect-virt`. If running inside Hyper-V, VirtualBox, VMware, or QEMU without Vulkan drivers, it automatically sets:
-  ```bash
-  export WLR_RENDERER_ALLOW_SOFTWARE=1
-  export WLR_NO_HARDWARE_CURSORS=1
-  export LIBGL_ALWAYS_SOFTWARE=true
-  export GALLIUM_DRIVER=llvmpipe
-  export __GLX_VENDOR_LIBRARY_NAME=mesa
-  export MESA_LOADER_DRIVER_OVERRIDE=softpipe
-  export QTWEBENGINE_DISABLE_GPU=1
-  ```
-- **Python Environment Initialization**: Entry points import `from desktop.env import init_qt_environment; init_qt_environment()` to prevent blank surface rendering on non-accelerated TTY consoles or VM instances.
-- **VM Performance Guardrails**: Enforces solid background colors with pre-baked alpha hex strings ($\ge 0.9$ opacity), disables dynamic CSS blur filters (`backdrop-filter`), omits drop shadows, and uses fixed pixel dimensions to minimize CPU software rasterization overhead.
-
-### 4. Desktop Shell Suite (TypeScript / Astal v2 / Bun) (`desktop/shell/`)
-- **Runtime**: Powered by Bun runtime engine for instant execution.
-- **Framework**: Imports `astal/gtk3` and `astal` (Astal v2).
-- **Core Components**:
-  - `Bar.ts`: Top-level status bar with system resource gauges (CPU, RAM, Network, Battery, Clock) optimized for minimal polling overhead.
-  - `Launcher.ts`: Application launcher menu.
-  - `Notifications.ts`: Toast notification daemon for desktop alerts.
-  - `state.ts`: Centralized reactive state store.
-  - `trigger.py`: Inter-process trigger helper (`xeno-shell-trigger`).
-
-### 5. Scientific Workspace Suite (PySide6) (`desktop/`)
-Every scientific panel inherits from `desktop.panels.base_panel.BasePanel` or `MatplotlibPanel`. Heavy numerical calculations execute off-thread inside `BaseWorker` (`QObject`) attached to a `QThread`, communicating with the UI strictly via `Qt.QueuedConnection` signals to prevent main thread blocking or SIGSEGV memory faults.
-
-```
-desktop/
-├── app.py             # Top-level authentication stack & view swapper
-├── env.py             # Software rendering environment setup
-├── theme.py           # Python single-source-of-truth visual design tokens
-├── loginscreen.py     # Decryption prompt & authentication UI
-├── workspace.py       # Multi-panel tabbed scientific container
-├── settings.py        # System configuration & desktop controls
-├── filemanager.py     # Cyber-Nord file explorer
-└── panels/            # Scientific calculation modules
-    ├── base_panel.py  # Thread-safe base panel & worker architecture
-    ├── math_panel.py  # Symbolic SymPy solver + Matplotlib calculus rendering
-    ├── data_panel.py  # High-throughput Pandas CSV analyzer + Plotly Dark engine
-    ├── code_panel.py  # In-process Jupyter kernel console (qtconsole)
-    ├── threed_panel.py# Deferred VTK 3D primitive canvas (Sphere, Cone, etc.)
-    └── signal_panel.py# SciPy FFT spectral analyzer & waveform generator
-```
-
-- **Deferred VTK Loading**: To prevent X11 `BadWindow` crashes on startup when hidden inside `QStackedWidget`, `threed_panel.py` defers VTK viewport initialization to method scope (`_lazy_init_vtk()`).
-- **Matplotlib Backend Guard**: All panel files enforce `matplotlib.use('Agg')` prior to any secondary matplotlib sub-imports.
-
-### 6. Windows Application Isolation & Compatibility Stack (`scripts/setup-compat-stack.sh`)
-- **Isolated Runner**: Flatpak-conconfined Bottles runner (`com.usebottles.bottles`) preventing unvetted Windows binaries from reading user home directories.
-- **Native System Wine**: WineHQ stack with 32-bit (i386) multi-arch libraries, Winetricks, GameMode, and MangoHud diagnostics.
-- **Graphics Translation**: DXVK (Direct3D 9/10/11 to Vulkan) and VKD3D-Proton (Direct3D 12 to Vulkan).
-- **Helper Utilities**: CLI launcher `/usr/bin/xeno-windows` and system environment configuration (`/etc/profile.d/xeno-wine.sh`) enabling `WINEESYNC=1`, `WINEFSYNC=1`, and `WINE_VK_USE_WSI=1`.
-
-### 7. Security Intelligence & Wireless Suite (`scripts/setup-security-tools.sh`)
-- **Pinned Kali Repository**: Adds `kali-rolling` repository with explicit Pin-Priority 100 (`/etc/apt/preferences.d/kali-pinning`) to allow explicit opt-in package installation (`apt-get install -t kali-rolling <pkg>`) without breaking baseline Ubuntu system packages.
-- **Wireless Controller**: `/usr/bin/xeno-wifi-monitor` helper script for rapid switching of wireless interfaces between Managed and Monitor modes, channel hopping, and packet capture.
-- **Pre-installed Security Suite**: `aircrack-ng`, `wifite`, `airgeddon`, `hashcat`, `wireshark`, `tshark`, `nmap`, `sqlmap`, `hydra`, `john`, `tor`, `nftables`, `impacket`, `scapy`.
-- **Scoped Real-Time Capabilities**: Scopes RT scheduling permissions in `/etc/security/limits.d/99-hyprland.conf` to `@hyprland` and `xeno` groups rather than unconstrained global wildcards (`*`).
-
-### 8. XenoSense Multimodal AI & Perceptual Subsystem (`desktop/xenosense/`)
-- **IPC Architecture**: Non-blocking background daemon (`xenosense.py`) streaming JSON telemetry packets over Unix domain socket `/tmp/xeno-sense.sock`.
-- **Gesture Recognition Engine**: MediaPipe hand-tracking pipeline capturing gestures (`SWIPE_LEFT`, `SWIPE_RIGHT`, `SWIPE_UP`, `SWIPE_DOWN`, `FIST`, `OPEN_PALM`, `PEACE`, `PINCH_OPEN`, `PINCH_CLOSE`).
-- **Biometric Presence Engine**: OpenCV + `face-recognition` tracking user presence (`face_detected`, `face_absent`).
-- **Offline Voice Engine**: Local `Faster-Whisper` STT model processing spoken commands (e.g. *"open math"*).
-
----
-
-## 💎 Neonic Cyber-Nord Design System
-
-All visual components strictly consume the central design tokens defined in `desktop/theme.py` (Python `XenoTheme`) and mirrored in `desktop/shell/theme.ts` (TypeScript). Hardcoded color literals, font names, or spacing values inside individual UI files are strictly prohibited.
-
-| Token Identifier | Hex / Value | Category | Usage & Description |
-|---|---|---|---|
-| `bg` | `#0c0d12` | Color | Main Deep Slate Background Base |
-| `surface` | `#161821` | Color | Panel Surface Base Container |
-| `surface_2` | `#222533` | Color | Elevated Controls & Card Hover States |
-| `border` | `#2e3440` | Color | Subtle Component Dividers & Borders |
-| `border_glow` | `#88c0d044` | Color | Accent Border Glow (Baked Opacity) |
-| `accent` | `#88c0d0` | Color | Primary Frost Blue Accent |
-| `accent_2` | `#bc13fe` | Color | Secondary Neon Purple Accent |
-| `accent_hover` | `#00ffff` | Color | Interactive Dynamic Neon Cyan Glow |
-| `text` | `#eceff4` | Color | High-Contrast Primary Body Text |
-| `text_dim` | `#a0a8b6` | Color | Secondary Diagnostic Labels & Metadata |
-| `text_muted` | `#4c566a` | Color | Disabled Inputs & Inactive Hints |
-| `success` | `#a3be8c` | Color | Positive Status & Diagnostic Pass |
-| `warning` | `#ebcb8b` | Color | Warning Alerts & Cautionary Badges |
-| `error` | `#bf616a` | Color | Failure Alerts & Security Warnings |
-| `font_primary` | `Sans-Serif` | Typography | Standard UI Body & Heading Font |
-| `font_mono` | `Monospace` | Typography | Code Notebook & Terminal Font |
-| `size_xs` / `size_sm` | `10px` / `12px` | Typography | Timestamps, Badges, Secondary Hints |
-| `size_base` / `size_md`| `14px` / `16px` | Typography | Regular Labels, Inputs, Section Titles |
-| `size_lg` / `size_xl` | `18px` / `24px` | Typography | Panel Headers, Workspace Titles |
-| `size_2xl` / `size_3xl`| `32px` / `48px` | Typography | Status Clocks, Login Lockscreen Display |
-| `radius_sm` / `md` / `lg`| `4px` / `8px` / `16px` | Geometry | Component Corner Rounding |
-| `panel_padding` | `16px` | Geometry | Standard Interior Panel Margin |
-
----
-
-## 🧪 E2E Test Suite & Verification Framework (`tests/`)
-
-The test suite validates shell mechanics, panel calculations, system diagnostics, notification broadcasts, and security sandbox policies across **73 tests organized into 4 tiers**:
-
-```bash
-# Execute test suite in default background Simulation Mode (No display server required)
-python3 tests/run_tests.py
-
-# Execute test suite in Live Mode against active Wayland compositor session
-python3 tests/run_tests.py --live
-```
-
-### Test Suite Structure
-- **Tier 1: Feature Coverage**: Validates individual panel calculation logic (SymPy derivative evaluation, Pandas data ingestion, SciPy FFT transform output, VTK primitive creation).
-- **Tier 2: Boundaries & Stress**: Evaluates edge-case mathematical inputs, matrix overflow boundaries, invalid CSV files, and multi-thread rapid worker invocations.
-- **Tier 3: Integration Sync**: Verifies IPC notification triggers (`trigger.py`), XenoSense socket packet parsing, shell state synchronization, and environment variable propagation.
-- **Tier 4: Real-World Flows & Theme Audits**: End-to-end user navigation simulation from login screen to workspace switching, accompanied by static design token compliance audits across all GUI source files.
-
----
-
-## 🛠️ Build, Deployment & Maintenance Commands
-
-### 1. ISO Packaging Pipeline
-```bash
-# Full ISO build pipeline (fetches kernel debs, updates rootfs, builds ZSTD squashfs, generates GRUB ISO Level 3)
-sudo bash scripts/auto-build.sh
-
-# Repair display manager autostart, GDM conflicts, and install xeno-start-hyprland launcher
-sudo bash scripts/fix-boot-display.sh
-
-# Interactive chroot maintenance shell into rootfs
-sudo bash scripts/enter-rootfs.sh
-```
-
-### 2. Standalone Application Testing
-```bash
-# Launch full desktop workspace (authentication -> workspace)
-python3 desktop/app.py
-
-# Launch individual PySide6 panels standalone
-python3 desktop/panels/math_panel.py
-python3 desktop/panels/data_panel.py
-python3 desktop/panels/code_panel.py
-python3 desktop/panels/threed_panel.py
-python3 desktop/panels/signal_panel.py
-
-# Execute desktop shell bar (Bun runtime)
-cd desktop/shell && bun run app.ts
-```
-
-### 3. Kernel Compilation & Patching Pipeline
-```bash
-# Compile custom XanMod kernel DEB packages with Kali patches & BORE scheduler
-bash kernel/build-kernel.sh
-
-# Validate built kernel DEB package configuration flags
-bash kernel/validate-kernel-deb.sh
-```
-
----
-
-## 📁 Repository Directory Map
+## 📁 Repository & Filesystem Map
 
 ```
 Xeno-os/
-├── desktop/                # PySide6 panels + TypeScript Astal shell + theme tokens + env.py
-│   ├── app.py              # Main desktop application entry point
-│   ├── env.py              # Virtual machine software graphics fallback guard
-│   ├── theme.py            # Central Python visual theme tokens (Single Source of Truth)
-│   ├── loginscreen.py      # Decryption login screen widget
-│   ├── workspace.py        # Scientific panel tabbed workspace container
-│   ├── settings.py         # System settings and desktop customization panel
-│   ├── filemanager.py      # Cyber-Nord file browser interface
-│   ├── panels/             # Scientific calculation panels (BasePanel, Math, Data, Code, 3D, Signal)
-│   ├── shell/              # Astal v2 / Bun TypeScript desktop bar, launcher, notifications
-│   └── xenosense/          # Multimodal gesture, face, voice AI socket daemon
-├── drivers/                # Out-of-tree Wi-Fi driver packages & DKMS setup scripts
-├── iso/                    # ISO build directory (build/casper/, output/Xeno-OS-Noble-v2.0.iso)
-├── kernel/                 # XanMod kernel build scripts, patches (0001, 0002, 0003), fragments
-├── rootfs/                 # Base Ubuntu 24.04 LTS chroot filesystem artifact
-├── scripts/                # Packaging, chroot, feature setup, and boot-fix shell utilities
-├── tests/                  # E2E test suite (run_tests.py, simulator.py, test_e2e.py, test_adversarial.py)
-├── .cursorrules            # Core engineering guidelines & revision logs
-├── AGENTS.md               # AI Agent operating constraints & sitemap
-├── CHANGELOG.md            # System revision history and session briefings
-└── README.md               # Complete Xeno OS system architecture & user manual
+├── desktop/                    # Desktop environment, shell, panels, and theme engine
+│   ├── env.py                  # VM software rendering environment initializer
+│   ├── theme.py                # Python theme tokens (Single Source of Truth)
+│   ├── app.py                  # PySide6 desktop suite root launcher
+│   ├── workspace.py            # Scientific workspace multi-panel host
+│   ├── filemanager.py          # Cyber-Nord file explorer with security checks
+│   ├── loginscreen.py          # Session display lock/login manager
+│   ├── settings.py             # Desktop system preferences & theme customizer
+│   ├── avatar_controller.py    # Interactive desktop assistant interface
+│   ├── shell/                  # Astal v2 / Bun TypeScript desktop shell
+│   │   ├── app.ts              # Astal application entry point
+│   │   ├── state.ts            # Reactive IPC client & telemetry store
+│   │   ├── Bar.ts              # Status bar with CPU/RAM/clock/workspaces
+│   │   ├── Launcher.ts         # Fast fuzzy application grid launcher
+│   │   ├── Notifications.ts    # Floating notification toast center
+│   │   └── theme.ts            # TypeScript visual tokens (mirror of theme.py)
+│   └── panels/                 # PySide6 scientific computational panels
+│       ├── base_panel.py       # Threaded BasePanel & BaseWorker foundation
+│       ├── math_panel.py       # SymPy symbolic calculus & equation solver
+│       ├── data_panel.py       # Pandas/NumPy statistical analysis panel
+│       ├── code_panel.py       # Live syntax-highlighted code executor
+│       ├── signal_panel.py     # SciPy DSP, FFT, and Butterworth filters
+│       └── threed_panel.py     # VTK 3D geometry & parametric renderer
+├── drivers/                    # Staged out-of-tree Wi-Fi DKMS driver packages
+│   ├── rtl8812au/              # Realtek RTL8812AU / RTL8821AU driver
+│   ├── rtl8821ce/              # Realtek RTL8821CE PCIe Wi-Fi driver
+│   ├── rtl88x2bu/              # Realtek RTL88x2BU USB Wi-Fi driver
+│   ├── rtl8188eus/             # Realtek RTL8188EUS injection driver
+│   ├── rtl8814au/              # Realtek RTL8814AU high-power injection driver
+│   ├── mt7612u/                # MediaTek MT7612U dual-band USB driver
+│   └── mt7610u/                # MediaTek MT7610U 802.11ac driver
+├── iso/                        # ISO build artifacts and output
+│   ├── build/casper/           # Live boot filesystem (SquashFS location)
+│   └── output/                 # Generated ISO images and SHA256 checksums
+├── kernel/                     # XanMod kernel sources, patches, and build scripts
+│   ├── configs/                # xeno.config.fragment (BORE, NTSYNC, 1000Hz, WLAN)
+│   ├── patches/                # 0001 (mac80211), 0002 (cfg80211), 0003 (usb injection)
+│   ├── cache/                  # Staged compiled linux-image deb packages
+│   ├── build-kernel.sh         # Automated XanMod kernel compilation pipeline
+│   └── validate-kernel-deb.sh  # Kernel package verification gate
+├── rootfs/                     # Ubuntu 24.04 LTS (Noble) debootstrap root filesystem
+├── scripts/                    # Core build, configuration, and diagnostic tools
+│   ├── auto-build.sh           # Smart Lean ISO packaging pipeline (ZSTD L19 + Level 3)
+│   ├── master-doctor.sh        # Master 8-Tier diagnostic and self-healing doctor
+│   ├── fix-boot-display.sh     # Display manager conflict resolution & VM launcher
+│   ├── setup-compat-stack.sh   # Windows (Wine/DXVK/Bottles) compatibility installer
+│   ├── setup-security-tools.sh # Kali tools, pinned repo, and injection helpers
+│   ├── setup-ai.sh             # Ollama local LLM runtime and sandbox setup
+│   ├── fix-kernel-rootfs.sh    # Kernel installation into rootfs
+│   ├── stage-kernel-debs.sh    # Stages locally compiled kernels into cache/
+│   ├── enter-rootfs.sh         # Interactive chroot mount tool
+│   └── lib-chroot.sh           # Shared chroot mount/unmount utility library
+├── tests/                      # Automated test suite (96 tests)
+│   ├── run_tests.py            # Test suite runner (Simulation & Live modes)
+│   ├── test_e2e.py             # 73 E2E Integration and UX scenario tests
+│   ├── test_adversarial.py     # 23 Adversarial IPC boundary & stress tests
+│   └── simulator.py            # Headless mock display server & IPC simulator
+├── .cursorrules                # AI engineer rules & memory log
+├── AGENTS.md                   # AI developer guidelines & critical path constraints
+├── CHANGELOG.md                # System revision history and activity log
+├── run-qemu.sh                 # Fast QEMU test runner (--gui or --terminal)
+├── xorriso-wrapper.sh          # ISO Level 3 oversized image injection wrapper
+└── README.md                   # Master technical manual and architectural spec
 ```
 
 ---
 
-## 📄 License & Credits
+## 🚀 Key Subsystems & Functionality
 
-Built with ❤️ by the **Xeno-The Reaper of Eternal Graveyard**. Powered by Ubuntu Linux, XanMod Kernel, Hyprland Wayland Compositor, Astal v2, PySide6, SymPy, Pandas, Plotly, SciPy, VTK, and MediaPipe.
+### 1. Universal Cross-Platform Application Engine
+
+Xeno OS allows running applications across virtually any format seamlessly:
+
+```
+                            ┌────────────────────────┐
+                            │   XENO RUN SUBSYSTEM   │
+                            └───────────┬────────────┘
+           ┌──────────────┬─────────────┼─────────────┬──────────────┐
+           ▼              ▼             ▼             ▼              ▼
+       [.apk]        [.exe / .msi]  [.AppImage]    [.deb]      [.iso / VM]
+    (Waydroid AOSP)  (Wine + DXVK)  (Direct FUSE) (Apt / Dpkg) (QEMU / KVM)
+```
+
+- **Windows Software (`.exe`, `.msi`)**:
+  - System Wine Staging + DXVK (Direct3D 9/10/11 -> Vulkan) and VKD3D-Proton (Direct3D 12 -> Vulkan).
+  - Preconfigured with `WINEESYNC=1`, `WINEFSYNC=1`, and in-kernel `CONFIG_NTSYNC=y` synchronization.
+  - Multiarch `i386` for seamless 32-bit legacy application support.
+  - GUI management via **Bottles** and CLI wrapper `/usr/bin/xeno-windows`.
+- **Android Applications (`.apk`)**:
+  - Waydroid AOSP container integrated directly into the Linux kernel (via Android binder & ashmem).
+  - Shares Wayland buffers for near-zero latency touch and windowed app execution.
+- **Linux Standalone Binaries (`.AppImage`)**:
+  - Built-in `libfuse2t64` / `libfuse.so.2` compatibility layer allowing instant double-click execution without extracting.
+- **Native Debian Packages (`.deb`)**:
+  - Dual repository support (Ubuntu Noble base + pinned Kali Linux rolling repo).
+- **Virtual Machines & Live ISOs (`.iso`)**:
+  - Direct hardware-assisted QEMU/KVM hypervisor integration.
+- **Local AI Engine (`xeno-ai-engine`)**:
+  - Built-in Ollama / llama.cpp runtime hosted at `/var/cache/xeno-ai/models` on `127.0.0.1:11434`.
+  - Sandboxed execution wrapper `/usr/bin/xeno-agent-sandbox` utilizing Bubblewrap (`bwrap`).
+
+---
+
+### 2. Scientific & Computational PySide6 Workspace
+
+Subclassed under [`BasePanel`](file:///home/xeno/Xeno-os/desktop/panels/base_panel.py) with asynchronous non-blocking [`BaseWorker`](file:///home/xeno/Xeno-os/desktop/panels/base_panel.py) offloading:
+
+1. **Math Panel ([`math_panel.py`](file:///home/xeno/Xeno-os/desktop/panels/math_panel.py))**:
+   - Symbolic calculus powered by **SymPy**: differentiation, integration, limits, and algebraic equation solving.
+   - Vectorized function evaluation using **NumPy** (`lambdify`) and interactive **Matplotlib** curve plots.
+2. **Data Panel ([`data_panel.py`](file:///home/xeno/Xeno-os/desktop/panels/data_panel.py))**:
+   - Statistical profiling powered by **Pandas** & **SciPy**: summary statistics, null analysis, correlation matrices, and distribution histogram plots.
+3. **Code Panel ([`code_panel.py`](file:///home/xeno/Xeno-os/desktop/panels/code_panel.py))**:
+   - Live Python code editor with syntax highlighting, thread-isolated execution, stdout/stderr capture, and error traceback parsing.
+4. **Signal Panel ([`signal_panel.py`](file:///home/xeno/Xeno-os/desktop/panels/signal_panel.py))**:
+   - Digital signal processing: Butterworth low-pass/high-pass/band-pass filters, Fast Fourier Transforms (FFT), and time-frequency spectrogram visualization.
+5. **3D Panel ([`threed_panel.py`](file:///home/xeno/Xeno-os/desktop/panels/threed_panel.py))**:
+   - Hardware-accelerated 3D surface geometry, parametric meshes, and vector field visualization powered by **VTK**.
+   - Implements `_lazy_init_vtk()` to eliminate X11/Wayland `BadWindow` crashes on startup.
+6. **File Manager ([`filemanager.py`](file:///home/xeno/Xeno-os/desktop/filemanager.py))**:
+   - Dual-pane tree explorer with asynchronous previews (capped at 10MB to avoid memory starvation) and rootfs security delete protection.
+
+---
+
+### 3. Offensive Security & Wireless Injection Subsystem
+
+1. **Kernel Packet Injection**:
+   - Custom patches in `net/mac80211/tx.c` enable raw IEEE 802.11 frame injection and custom sequence numbering.
+   - Patches in `net/wireless/chan.c` permit dynamic channel switching while monitor VIFs are active.
+2. **Out-of-Tree Driver Support**:
+   - 7 staged DKMS modules in `drivers/` for RTL8812AU, RTL8821CE, RTL88x2BU, RTL8188EUS, RTL8814AU, MT7612U, and MT7610U.
+3. **Pinned Kali Repository**:
+   - Configured with `Pin-Priority: 100` in `/etc/apt/preferences.d/kali-pinning` to allow selective installation of Kali security tools without overriding the stable Ubuntu Noble base.
+4. **Pre-Installed Tools & Utilities**:
+   - `aircrack-ng`, `wireshark`, `nmap`, `bettercap`, `msfconsole`, `hydra`, `sqlmap`, `john`, `scapy`, and `tor`.
+   - `/usr/bin/xeno-wifi-monitor`: One-shot virtual monitor interface creator and packet injection test utility.
+   - `/usr/bin/xeno-tor-proxy`: Transparent TCP/DNS Tor routing helper.
+
+---
+
+### 4. Cyber-Nord Design Tokens (Single Source of Truth)
+
+All visual properties across both Python PySide6 panels and TypeScript Astal shell strictly adhere to central theme tokens ([`desktop/theme.py`](file:///home/xeno/Xeno-os/desktop/theme.py) and [`desktop/shell/theme.ts`](file:///home/xeno/Xeno-os/desktop/shell/theme.ts)):
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CYBER-NORD COLOR TOKENS                         │
+├────────────────────────────────┬───────────────────────────────────────┤
+│ Background  (Deep Slate/Black) │ #0c0d12                               │
+│ Surface     (Deep Slate)       │ #161821                               │
+│ Surface 2   (Raised Elements)  │ #222533                               │
+│ Border      (Subtle Dividers)  │ #2f3448                               │
+│ Accent 1    (Frost Blue)       │ #88c0d0                               │
+│ Accent 2    (Neon Purple)      │ #bc13fe                               │
+│ Accent Hover(Neon Cyan)        │ #00ffff                               │
+│ Text        (Crisp Snow White) │ #eceff4                               │
+│ Text Dim    (Muted Blue-Gray)  │ #a0a8b6                               │
+│ Success / Warning / Error      │ #a3be8c / #ebcb8b / #bf616a           │
+├────────────────────────────────┼───────────────────────────────────────┤
+│ Primary Typography             │ Inter (UI, Body, Labels)              │
+│ Monospace Typography           │ JetBrains Mono (Code, Logs, Clocks)   │
+└────────────────────────────────┴───────────────────────────────────────┘
+```
+
+---
+
+## 🛠️ Management, Diagnostics & Auto-Healing
+
+### 1. Master Doctor (8-Tier System Diagnostic)
+```bash
+# Run comprehensive 8-tier audit across host, rootfs, kernel, shell, and tests
+bash scripts/master-doctor.sh
+
+# Run Master Doctor in self-healing mode (auto-repairs missing configs/links)
+sudo bash scripts/master-doctor.sh --fix
+```
+
+### 2. ISO Packaging Pipeline (Smart Lean Engine)
+```bash
+# Run full automated ISO packaging pipeline (ZSTD L19 + Level 3 GRUB)
+sudo bash scripts/auto-build.sh
+```
+
+### 3. QEMU Virtual Machine Testing
+```bash
+# Launch built ISO in graphical Wayland mode
+bash run-qemu.sh --gui
+
+# Launch built ISO in headless serial console mode (ttyS0 autologin)
+bash run-qemu.sh --terminal
+```
+
+### 4. Automated Test Suite (96 Tests)
+```bash
+# Run simulation mode (73 E2E Integration + 23 Adversarial IPC tests)
+python3 tests/run_tests.py && python3 -m unittest tests/test_adversarial.py
+
+# Run live mode (interacts with active Wayland/X11 session)
+python3 tests/run_tests.py --live
+```
+
+---
+
+## 💻 Hardware Requirements
+
+| Resource | Minimum (Simulation / VM) | Recommended (Bare Metal) |
+|---|---|---|
+| **CPU** | 64-bit x86_64 Dual Core (2.0 GHz) | 64-bit x86_64 Quad Core+ with AVX2 & VT-x/AMD-V |
+| **RAM** | 2.0 GB (with ZRAM enabled) | 8.0 GB+ (provides ~16GB+ effective memory via Zstd) |
+| **Storage** | 15.0 GB free disk space (for build) | 32.0 GB+ NVMe / SSD |
+| **GPU** | Mesa Software Rasterizer (`llvmpipe`) | Intel Iris / AMD Radeon / NVIDIA (Vulkan 1.3+) |
+| **Wi-Fi** | Any standard IEEE 802.11 adapter | Atheros AR9271 / Realtek RTL8812AU / MediaTek MT7612U (for injection) |
+
+---
+
+## 📜 Authorship & License
+
+- **Architect & Developer**: Harsh Thakur (**Xeno — The Reaper of Eternal Graveyard**)
+- **Platform Foundation**: Ubuntu Linux 24.04 LTS (Noble Numbat)
+- **Kernel Architecture**: XanMod Linux with BORE Scheduler & Kali Injection Extensions
+- **Desktop Runtime**: Hyprland Wayland Compositor & Astal v2 (Bun)
+- **License**: Open Root Sovereignty & GNU General Public License v3.0

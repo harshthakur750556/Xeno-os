@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QLineEdit, QPushButton, QTabWidget, QFormLayout, 
                                QSpinBox, QDoubleSpinBox, QApplication)
-from PySide6.QtCore import QThread, Signal, QObject, Qt, QMetaObject, Q_ARG
+from PySide6.QtCore import QThread, Signal, QObject, Qt, QMetaObject, Q_ARG, QTimer
 
 # STEP 4: Central theme — never hardcode colors/fonts/spacing in this file
 from desktop.theme import theme
@@ -250,8 +250,6 @@ class SettingsCenter(BasePanel):
             self.save_btn.setEnabled(True)
             self.status_label.setText("Settings saved successfully!")
             # Clear status message after 3 seconds
-            QTimer = QApplication.instance().metaObject() # Or simple PySide timer
-            from PySide6.QtCore import QTimer
             QTimer.singleShot(3000, lambda: self.status_label.setText(""))
 
     def on_error(self, error_msg: str):

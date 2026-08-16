@@ -256,11 +256,21 @@ class XenoSystemSimulator:
 
         # F3: Notification APIs
         elif cmd == "notification:send":
-            title = params.get("title", "")
-            body = params.get("body", "")
-            urgency = params.get("urgency", "normal")
-            sound = params.get("sound", "")
-            timeout = params.get("timeout", 3000)
+            if "urgency" in params and not isinstance(params["urgency"], str):
+                return {"status": "error", "message": "Urgency must be a string"}
+            title = str(params.get("title") or "")
+            body = str(params.get("body") or "")
+            urgency = str(params.get("urgency") or "normal")
+            sound = str(params.get("sound") or "")
+            raw_timeout = params.get("timeout", 3000)
+            try:
+                timeout = int(raw_timeout)
+                if timeout > 0:
+                    timeout = min(timeout, 2147483647)
+                else:
+                    timeout = 3000
+            except (ValueError, TypeError):
+                timeout = 3000
             
             if not title and not body:
                 self.log("Notification Center received null message notification")
@@ -307,7 +317,7 @@ class XenoSystemSimulator:
 
         # F4: Sandbox APIs
         elif cmd == "sandbox:start":
-            mem = params.get("memory", "2GB")
+            mem = str(params.get("memory") or "2GB")
             threads = params.get("threads", 2)
             
             with self.lock:
@@ -320,15 +330,27 @@ class XenoSystemSimulator:
                     return {"status": "error", "message": "Instance lock active: concurrent sandbox wrapper spawn collision"}
                 
                 # Check memory limits
-                if "MB" in mem:
-                    m_val = int(mem.replace("MB", ""))
-                    if m_val < 128:
-                        self.log(f"Sandbox execution failed: memory limit {mem} below minimum threshold")
-                        return {"status": "error", "message": "Resource limits violated: memory allocation below 128MB threshold"}
+                mem_upper = mem.strip().upper()
+                mem_mb = None
+                try:
+                    if mem_upper.endswith("GB"):
+                        mem_mb = float(mem_upper[:-2].strip()) * 1024
+                    elif mem_upper.endswith("MB"):
+                        mem_mb = float(mem_upper[:-2].strip())
+                    elif mem_upper.endswith("KB"):
+                        mem_mb = float(mem_upper[:-2].strip()) / 1024
+                    else:
+                        mem_mb = float(mem_upper)
+                except (ValueError, TypeError):
+                    mem_mb = None
+
+                if mem_mb is None or mem_mb < 128:
+                    self.log(f"Sandbox execution failed: memory limit {mem} below minimum threshold")
+                    return {"status": "error", "message": "Resource limits violated: memory allocation below 128MB threshold"}
                 
                 # Thread allocation limit check
-                if threads > self.sandbox_max_threads:
-                    self.log(f"Sandbox execution failed: thread allocation {threads} exceeds limit {self.sandbox_max_threads}")
+                if not isinstance(threads, int) or isinstance(threads, bool) or threads < 1 or threads > self.sandbox_max_threads:
+                    self.log(f"Sandbox execution failed: thread allocation {threads} invalid or exceeds limit {self.sandbox_max_threads}")
                     return {"status": "error", "message": "Resource limits violated: native thread allocation limit exceeded"}
                     
                 self.sandbox_running = True

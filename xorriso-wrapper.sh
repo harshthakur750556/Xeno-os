@@ -19,5 +19,7 @@ done
 printf '%s\n' "${args[@]}" > /tmp/xorriso-args.log 2>/dev/null || true
 
 # Pass the modified arguments to the real xorriso
-exec /usr/bin/xorriso "${args[@]}"
+XORRISO_BIN="$(command -v xorriso 2>/dev/null || echo "/usr/bin/xorriso")"
+exec "$XORRISO_BIN" "${args[@]}"
+
 

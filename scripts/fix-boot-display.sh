@@ -162,11 +162,23 @@ fi
 LAUNCHER_EOF
 chmod +x "$ROOTFS/usr/bin/xeno-start-hyprland"
 
+# ── 3.5 Serial Console Autologin for QEMU / headless terminal ──
+echo "[3.5/4] Configuring serial console autologin on ttyS0..."
+mkdir -p "$ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d"
+cat > "$ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << 'SERIAL_EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -- \\u' --keep-baud 115200,38400,9600 --noclear --autologin xeno %I $TERM
+SERIAL_EOF
+mkdir -p "$ROOTFS/etc/systemd/system/getty.target.wants"
+ln -sf /usr/lib/systemd/system/serial-getty@.service "$ROOTFS/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service" 2>/dev/null || true
+
 # ── 4. Verify ────────────────────────────────────────────────
 echo "[4/4] Verifying..."
 echo "  display-manager.service: $(ls "$ROOTFS/etc/systemd/system/display-manager.service" 2>/dev/null || echo 'REMOVED ✓')"
 echo "  xeno-start-hyprland:     $(ls -la "$ROOTFS/usr/bin/xeno-start-hyprland" | awk '{print $1, $5, $9}')"
 echo "  limits:                  $ROOTFS/etc/security/limits.d/99-hyprland.conf"
+echo "  serial-getty@ttyS0:      $ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf"
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✓ Boot display fix complete"

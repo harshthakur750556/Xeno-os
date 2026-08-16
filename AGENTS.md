@@ -4,10 +4,10 @@
  ░█──░█ ░█▄▄▄ ░█──▀█ ░█▄▄█ ── ░█▄▄█ ░█▄▄█ 
 ```
 
-# AGENTS.md — Xeno OS Engineering Guidelines
+# AGENTS.md — Xeno OS AI Developer & Engineering Guidelines
 
 ## Project Overview
-Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kernel (v6.12+ BORE scheduler + Kali mac80211 patches), Hyprland Wayland compositor, TypeScript/Astal v2 desktop shell, and PySide6 scientific GUI panels.
+Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kernel (v6.12+ BORE scheduler + Kali mac80211 patches), Hyprland Wayland compositor, TypeScript/Astal v2 desktop shell, universal application execution (.apk, .exe/.msi, .AppImage, .deb, .iso), and PySide6 scientific GUI panels.
 
 ---
 
@@ -26,22 +26,31 @@ Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kerne
 
 ---
 
-## Primary Management Scripts
+## Primary Management & Diagnostic Scripts
 
 | Command | Purpose |
 |---|---|
-| `sudo bash scripts/auto-build.sh` | Full ISO packaging pipeline (fetches kernel debs, updates rootfs, builds ZSTD squashfs, generates GRUB ISO Level 3) |
+| `bash scripts/master-doctor.sh` | 8-Tier comprehensive system diagnostic, test suite runner, and integrity verifier |
+| `sudo bash scripts/master-doctor.sh --fix` | Master Doctor in self-healing mode (automatically repairs discovered issues) |
+| `sudo bash scripts/auto-build.sh` | Full Smart Lean ISO packaging pipeline (ZSTD L19 1MB-block SquashFS + Level 3 GRUB ISO) |
+| `bash run-qemu.sh --gui` | Run built ISO in QEMU with graphical Wayland display window |
+| `bash run-qemu.sh --terminal` | Run built ISO in QEMU in headless serial console mode |
 | `bash scripts/stage-kernel-debs.sh` | Validates and stages locally compiled kernel packages from `kernel/output/` into `kernel/cache/` |
-| `sudo bash scripts/fix-boot-display.sh` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher `/usr/bin/xeno-start-hyprland` |
+| `sudo bash scripts/fix-boot-display.sh` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher |
 | `sudo bash scripts/enter-rootfs.sh` | Interactive chroot into rootfs |
 
 ---
 
-## E2E Test Suite Execution
+## Automated Test Suite Execution
 
 Simulation Mode (headless, no display server required):
 ```bash
 python3 tests/run_tests.py
+```
+
+Adversarial IPC Boundary Suite:
+```bash
+python3 -m unittest tests/test_adversarial.py
 ```
 
 Live Mode (interacts with active Wayland/X11 session):
@@ -49,7 +58,7 @@ Live Mode (interacts with active Wayland/X11 session):
 python3 tests/run_tests.py --live
 ```
 
-Total Test Count: 73 tests across 4 tiers (Feature Coverage, Boundaries & Stress, Integration Sync, Real-World Flows & Theme Audits).
+Total Test Count: **96 tests** (73 E2E Integration tests + 23 Adversarial boundary tests).
 
 ---
 
@@ -75,13 +84,14 @@ Total Test Count: 73 tests across 4 tiers (Feature Coverage, Boundaries & Stress
 ```
 Xeno-os/
 ├── desktop/          # PySide6 panels + TypeScript Astal shell + theme tokens (theme.py/theme.ts) + env.py
-├── drivers/          # Hardware driver packages & setup
+├── drivers/          # Hardware driver packages & setup (Realtek/MediaTek DKMS)
 ├── iso/              # ISO build directory (build/casper/, output/)
 ├── kernel/           # XanMod kernel patches, build scripts, GitHub CI output
 ├── rootfs/           # Ubuntu 24.04 debootstrap root filesystem
-├── scripts/          # Packaging, chroot, and boot-fix shell scripts
-├── tests/            # E2E test suite (run_tests.py, simulator.py, mock bin/)
+├── scripts/          # Packaging, doctor, chroot, and boot-fix shell scripts
+├── tests/            # Automated test suites (96 tests across E2E & Adversarial)
 ├── .cursorrules      # Core engineering guidelines & revision logs
 ├── AGENTS.md         # Developer & AI agent instructions
+├── CHANGELOG.md      # Chronological revision history & activity log
 └── README.md         # Cyber-Nord design specification & user manual
 ```

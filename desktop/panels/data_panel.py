@@ -324,34 +324,40 @@ class DataPanel(BasePanel):
                 self.chart_view.setHtml(html)
             else:
                 # Render inside Matplotlib canvas fallback
-                self.ax.clear()
-                self.ax.set_facecolor(theme.bg)
-                self.ax.tick_params(colors=theme.text_dim, labelsize=9)
-                self.ax.xaxis.label.set_color(theme.text_dim)
-                self.ax.yaxis.label.set_color(theme.text_dim)
-                for spine in self.ax.spines.values():
-                    spine.set_edgecolor(theme.border)
-                self.ax.grid(True, color=theme.border, linestyle="--", linewidth=0.5)
+                try:
+                    self.ax.clear()
+                    self.ax.set_facecolor(theme.bg)
+                    self.ax.tick_params(colors=theme.text_dim, labelsize=9)
+                    self.ax.xaxis.label.set_color(theme.text_dim)
+                    self.ax.yaxis.label.set_color(theme.text_dim)
+                    for spine in self.ax.spines.values():
+                        spine.set_edgecolor(theme.border)
+                    self.ax.grid(True, color=theme.border, linestyle="--", linewidth=0.5)
 
-                x = plot_data["x_values"]
-                y = plot_data["y_values"]
+                    x = plot_data.get("x_values", [])
+                    y = plot_data.get("y_values", [])
 
-                if plot_type == "Scatter":
-                    self.ax.scatter(x, y, color=theme.accent, alpha=0.8, edgecolors="none")
-                    self.ax.set_ylabel(y_col)
-                elif plot_type == "Line":
-                    self.ax.plot(x, y, color=theme.accent, linewidth=1.5)
-                    self.ax.set_ylabel(y_col)
-                elif plot_type == "Bar":
-                    self.ax.bar(x[:50], y[:50], color=theme.accent_2, edgecolor=theme.border)
-                    self.ax.set_ylabel(y_col)
-                elif plot_type == "Histogram":
-                    self.ax.hist(x, bins=20, color=theme.accent, edgecolor=theme.bg)
-                    self.ax.set_ylabel("Count")
+                    if plot_type == "Scatter":
+                        self.ax.scatter(x, y, color=theme.accent, alpha=0.8, edgecolors="none")
+                        self.ax.set_ylabel(y_col or "")
+                    elif plot_type == "Line":
+                        self.ax.plot(x, y, color=theme.accent, linewidth=1.5)
+                        self.ax.set_ylabel(y_col or "")
+                    elif plot_type == "Bar":
+                        self.ax.bar(x[:50], y[:50], color=theme.accent_2, edgecolor=theme.border)
+                        self.ax.set_ylabel(y_col or "")
+                    elif plot_type == "Histogram":
+                        x_num = pd.to_numeric(pd.Series(x), errors='coerce').dropna().values
+                        self.ax.hist(x_num, bins=20, color=theme.accent, edgecolor=theme.bg)
+                        self.ax.set_ylabel("Count")
 
-                self.ax.set_xlabel(x_col)
-                self.fig.tight_layout(pad=1.5)
-                self.chart_canvas.draw()
+                    self.ax.set_xlabel(x_col or "")
+                    self.fig.tight_layout(pad=1.5)
+                    self.chart_canvas.draw()
+                except Exception as e:
+                    self.ax.clear()
+                    self.ax.text(0.5, 0.5, f"Render Error: {e}", color=theme.error, ha='center', va='center')
+                    self.chart_canvas.draw()
 
             self.plot_btn.setText("Plot")
             self.plot_btn.setEnabled(True)

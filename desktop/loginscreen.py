@@ -220,15 +220,21 @@ class LoginScreen(BasePanel):
             self.login_success.emit()
         else:
             self.login_btn.setEnabled(True)
-            self.login_btn.setText("Authenticate")
+            self.login_btn.setText("► INITIALIZE SESSION")
             self.status_out.setText(result["error"])
             self.pass_input.clear()
 
     def on_error(self, error_msg: str):
         super().on_error(error_msg)
         self.login_btn.setEnabled(True)
-        self.login_btn.setText("Authenticate")
+        self.login_btn.setText("► INITIALIZE SESSION")
         self.status_out.setText(f"System Error: {error_msg}")
+
+    def closeEvent(self, event):
+        if hasattr(self, 'clock_timer') and self.clock_timer.isActive():
+            self.clock_timer.stop()
+        super().closeEvent(event)
+
 
 
 if __name__ == "__main__":

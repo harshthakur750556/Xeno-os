@@ -61,23 +61,31 @@ class CodePanel(BasePanel):
         orig_run_cell = self.kernel.shell.run_cell
         def run_cell_with_isolation(raw_cell, *args, **kwargs):
             import signal
+            import threading
             def alarm_handler(signum, frame):
                 raise TimeoutError("Execution timed out (30s limit exceeded)")
             
             old_handler = None
-            if hasattr(signal, "SIGALRM"):
-                old_handler = signal.signal(signal.SIGALRM, alarm_handler)
-                signal.alarm(30)
+            can_alarm = hasattr(signal, "SIGALRM") and threading.current_thread() is threading.main_thread()
+            if can_alarm:
+                try:
+                    old_handler = signal.signal(signal.SIGALRM, alarm_handler)
+                    signal.alarm(30)
+                except Exception:
+                    can_alarm = False
             try:
                 return orig_run_cell(raw_cell, *args, **kwargs)
             except Exception as e:
                 print(f"[CodePanel Execution Error] {e}")
                 raise
             finally:
-                if hasattr(signal, "SIGALRM"):
-                    signal.alarm(0)
-                    if old_handler is not None:
-                        signal.signal(signal.SIGALRM, old_handler)
+                if can_alarm:
+                    try:
+                        signal.alarm(0)
+                        if old_handler is not None:
+                            signal.signal(signal.SIGALRM, old_handler)
+                    except Exception:
+                        pass
 
         self.kernel.shell.run_cell = run_cell_with_isolation
 

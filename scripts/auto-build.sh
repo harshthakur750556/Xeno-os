@@ -14,22 +14,13 @@ else
 fi
 
 ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
-if [ -n "${XENO_ISO_DEST:-}" ]; then
-    if [ -d "$XENO_ISO_DEST" ]; then
-        TARGET_ISO="$XENO_ISO_DEST/${ISO_NAME}"
-    else
-        TARGET_ISO="$XENO_ISO_DEST"
-    fi
-elif [ -d "/mnt/c/Users/harsh" ]; then
-    TARGET_ISO="/mnt/c/Users/harsh/${ISO_NAME}"
-else
-    TARGET_ISO="$WS_DIR/iso/output/${ISO_NAME}"
-fi
+TARGET_ISO="$WS_DIR/iso/output/${ISO_NAME}"
+WIN_HOST_DIR="/mnt/c/Users/harsh"
 
-# Clean up all older ISO versions (v1, v2, v3, etc.)
-find "$WS_DIR/iso/output" -name "xeno_os*.iso" ! -name "${ISO_NAME}" -delete 2>/dev/null || true
-if [ -d "$(dirname "$TARGET_ISO")" ] && [ "$TARGET_ISO" != "$WS_DIR/iso/output/${ISO_NAME}" ]; then
-    find "$(dirname "$TARGET_ISO")" -maxdepth 1 -name "xeno_os*.iso" ! -name "${ISO_NAME}" -delete 2>/dev/null || true
+# Clean up all older ISO and SHA256 versions across WSL & Windows host
+find "$WS_DIR/iso/output" -mindepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
+if [ -d "$WIN_HOST_DIR" ]; then
+    find "$WIN_HOST_DIR" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
 fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
@@ -277,6 +268,9 @@ apt-get clean
 echo "$NEW_VERSION" > /tmp/xeno-boot-kver
 EOF
 
+trap - EXIT
+xeno_chroot_umount "$ROOTFS"
+
 KVER=$(cat "$ROOTFS/tmp/xeno-boot-kver")
 echo "Using kernel: $KVER"
 
@@ -305,25 +299,41 @@ terminal_output serial console
 set timeout=5
 set default=0
 menuentry "Xeno OS Live (Wayland - Universal)" {
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 quiet splash username=xeno hostname=xeno-os ---
+    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 username=xeno hostname=xeno-os ---
     initrd /casper/initrd
 }
 menuentry "Xeno OS Live (Safe graphics)" {
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 quiet splash username=xeno hostname=xeno-os xeno.safegraphics=1 ---
+    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 username=xeno hostname=xeno-os xeno.safegraphics=1 ---
     initrd /casper/initrd
 }
 EOF
 
-# ── 8. SquashFS ──────────────────────────────────────────────
-echo "Compressing root filesystem into SquashFS (ZSTD L6)..."
-rm -f "$WS_DIR/iso/build/casper/filesystem.squashfs"
+# ── 7.5 Smart Lean Optimization (Strip caches, bytecode & temp data) ──
+echo "Optimizing rootfs footprint (purging temporary build caches, bytecode, and obsolete headers)..."
+rm -rf "$ROOTFS/root/.cache" "$ROOTFS/root/.npm" "$ROOTFS/root/.cargo/registry" 2>/dev/null || true
+rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* 2>/dev/null || true
+rm -rf "$ROOTFS/tmp"/* "$ROOTFS/var/tmp"/* "$ROOTFS/var/log"/* 2>/dev/null || true
+rm -rf "$ROOTFS/usr/src/linux-headers-6.8.0-124"* "$ROOTFS/usr/src/linux-headers-6.8.0-136"* 2>/dev/null || true
+find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+
+# ── 8. SquashFS (Smart High-Compression ZSTD L19) ─────────────
+mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/tmp" "$ROOTFS/run"
+touch "$ROOTFS/proc/.keep" "$ROOTFS/sys/.keep" "$ROOTFS/dev/.keep" "$ROOTFS/tmp/.keep" "$ROOTFS/run/.keep"
+
+echo "Compressing root filesystem into smart optimized SquashFS (ZSTD L19, 1MB blocks)..."
 mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
-    -comp zstd -Xcompression-level 6 -noappend \
-    -e "$ROOTFS/proc" -e "$ROOTFS/sys" -e "$ROOTFS/dev" -e "$ROOTFS/tmp" \
-    -e "$ROOTFS/run" -e "$ROOTFS/var/cache/apt/archives"
+    -comp zstd -Xcompression-level 19 -b 1M -noappend \
+    -wildcards \
+    -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
+    -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
+    -e "root/.cache/*" "root/.npm/*" "root/.cargo/registry/*" \
+    -e "usr/share/doc/*" "usr/share/man/*" \
+    -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
+    -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
 
 # Generate filesystem.size for Casper live boot validation
-printf $(du -sx --block-size=1 "$ROOTFS" | cut -f1) > "$WS_DIR/iso/build/casper/filesystem.size"
+printf "%s\n" "$(du -sx --block-size=1 "$ROOTFS" | cut -f1)" > "$WS_DIR/iso/build/casper/filesystem.size"
 
 # ── 9. GRUB ISO (Dual BIOS i386-pc + UEFI x86_64-efi via wrapper) ──
 mkdir -p "$WS_DIR/iso/build/boot/grub/i386-pc" "$WS_DIR/iso/build/boot/grub/x86_64-efi" "$WS_DIR/iso/build/EFI/BOOT"
@@ -361,23 +371,14 @@ grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
 echo "Generating SHA256 checksum..."
 (cd "$WS_DIR/iso/output" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
 
-if [ "$TARGET_ISO" != "$LOCAL_ISO_PATH" ]; then
-    echo "Copying ISO to target location: $TARGET_ISO..."
-    if ! cp "$LOCAL_ISO_PATH" "$TARGET_ISO" 2>/dev/null; then
-        echo "Standard cp failed (likely WSL /mnt 9P memory limit) — attempting chunked dd copy..."
-        dd if="$LOCAL_ISO_PATH" of="$TARGET_ISO" bs=64M status=progress conv=fsync || {
-            echo "WARNING: Could not copy ISO to $TARGET_ISO. Local copy remains safe at $LOCAL_ISO_PATH."
-        }
-    fi
-    cp "${LOCAL_ISO_PATH}.sha256" "${TARGET_ISO}.sha256" 2>/dev/null || true
+if [ -d "$WIN_HOST_DIR" ]; then
+    echo "Copying ISO artifact to Windows host directory ($WIN_HOST_DIR/${ISO_NAME})..."
+    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || dd if="$LOCAL_ISO_PATH" of="$WIN_HOST_DIR/${ISO_NAME}" bs=64M conv=fsync 2>/dev/null || true
+    cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/${ISO_NAME}.sha256" 2>/dev/null || true
 fi
 
-trap - EXIT
-xeno_chroot_umount "$ROOTFS"
-
-# Auto-increment version by +0.5 for the next build
-NEXT_VERSION=$(python3 -c "print(round($BUILD_VERSION + 0.5, 1))")
-echo "$NEXT_VERSION" > "$VERSION_FILE"
+# Calculate next version for display log
+NEXT_VERSION=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(round(float(m.group(1)) + 0.5, 1) if m else '4.5')")
 
 echo "=== AUTOMATED PIPELINE COMPLETE ==="
 echo "ISO: $TARGET_ISO"

@@ -229,7 +229,7 @@ export function handleIPCRequest(request: any): any {
     case "simulator:set_workspaces":
       workspacesOverridden = true;
       const activeId = params.active;
-      const ids = params.workspaces || [];
+      const ids = Array.isArray(params.workspaces) ? params.workspaces : [];
       workspacesList.set(ids.map((id: number) => ({ id, active: id === activeId })));
       return { status: "success" };
       
@@ -264,8 +264,9 @@ export function handleIPCRequest(request: any): any {
       return { status: "success", clock: clockTime.get() };
       
     case "status_bar:get_cpu":
-      let cpu = cpuUsage.get();
-      cpu = Math.max(0, Math.min(100, cpu));
+      let cpu = Number(cpuUsage.get());
+      if (isNaN(cpu)) cpu = 0;
+      cpu = Math.max(0, Math.min(100, Math.round(cpu)));
       return { status: "success", cpu };
       
     case "status_bar:get_ram":
@@ -329,11 +330,15 @@ export function handleIPCRequest(request: any): any {
       
     // F3: Notification APIs
     case "notification:send":
-      const notifTitle = params.title || "";
-      const notifBody = params.body || "";
-      const urgency = params.urgency || "normal";
-      const sound = params.sound || "";
-      const timeout = typeof params.timeout === "number" ? params.timeout : 3000;
+      if (params.urgency !== undefined && typeof params.urgency !== "string") {
+        return { status: "error", message: "Urgency must be a string" };
+      }
+      const notifTitle = typeof params.title === "string" ? params.title : "";
+      const notifBody = typeof params.body === "string" ? params.body : "";
+      const urgency = typeof params.urgency === "string" ? params.urgency : "normal";
+      const sound = typeof params.sound === "string" ? params.sound : "";
+      const rawTimeout = typeof params.timeout === "number" ? params.timeout : 3000;
+      const timeout = rawTimeout > 0 ? Math.min(rawTimeout, 2147483647) : 3000;
       
       if (!notifTitle && !notifBody) {
         return { status: "error", message: "Notification title and body cannot both be empty" };
@@ -344,7 +349,7 @@ export function handleIPCRequest(request: any): any {
       const notifItem: Notification = { id, title: notifTitle, body: notifBody, urgency, sound, timeout };
       
       notificationQueue.set([...notificationQueue.get(), notifItem]);
-      notificationLogs.set([...notificationLogs.get(), `${urgency.toUpperCase()}: ${notifTitle} - ${notifBody}`]);
+      notificationLogs.set([...notificationLogs.get(), `${String(urgency).toUpperCase()}: ${notifTitle} - ${notifBody}`]);
       
       if (sound) {
         soundPlayed.set([...soundPlayed.get(), sound]);
@@ -371,8 +376,8 @@ export function handleIPCRequest(request: any): any {
       
     // F4: Sandbox APIs
     case "sandbox:start":
-      const mem = params.memory || "2GB";
-      const threads = params.threads || 2;
+      const mem = String(params.memory || "2GB");
+      const threads = typeof params.threads === "number" ? params.threads : 2;
       
       if (!displaySocketExists.get()) {
         return { status: "error", message: "No Wayland or X11 graphics driver/display socket found" };
@@ -381,14 +386,23 @@ export function handleIPCRequest(request: any): any {
         return { status: "error", message: "Instance lock active: concurrent sandbox wrapper spawn collision" };
       }
       
-      if (mem.includes("MB")) {
-        const mbVal = parseInt(mem.replace("MB", ""), 10);
-        if (mbVal < 128) {
-          return { status: "error", message: "Resource limits violated: memory allocation below 128MB threshold" };
-        }
+      let memMB = 0;
+      const memUpper = mem.trim().toUpperCase();
+      if (memUpper.endsWith("GB")) {
+        memMB = parseFloat(memUpper.replace("GB", "").trim()) * 1024;
+      } else if (memUpper.endsWith("MB")) {
+        memMB = parseFloat(memUpper.replace("MB", "").trim());
+      } else if (memUpper.endsWith("KB")) {
+        memMB = parseFloat(memUpper.replace("KB", "").trim()) / 1024;
+      } else if (!isNaN(Number(memUpper))) {
+        memMB = parseFloat(memUpper);
+      }
+
+      if (isNaN(memMB) || memMB < 128) {
+        return { status: "error", message: "Resource limits violated: memory allocation below 128MB threshold" };
       }
       
-      if (threads > 4) {
+      if (typeof threads !== "number" || isNaN(threads) || !Number.isInteger(threads) || threads < 1 || threads > 4) {
         return { status: "error", message: "Resource limits violated: native thread allocation limit exceeded" };
       }
       

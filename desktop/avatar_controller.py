@@ -39,6 +39,7 @@ class AvatarController(QObject):
             return
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
                 s.connect(self.ipc_socket)
                 s.sendall(b'{"command": "get_avatar_state"}\n')
                 data = s.recv(1024)
@@ -48,3 +49,4 @@ class AvatarController(QObject):
                         self.set_state(resp["state"])
         except Exception:
             pass
+

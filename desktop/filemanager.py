@@ -29,6 +29,10 @@ class FileWorker(BaseWorker):
                 raise FileNotFoundError(f"Path does not exist: {target_path}")
 
             if action == "Delete":
+                normalized = os.path.realpath(target_path)
+                protected = {"/", "/root", "/home", "/etc", "/usr", "/var", "/bin", "/sbin", "/boot", "/sys", "/proc", "/dev", os.path.realpath(os.path.expanduser("~"))}
+                if normalized in protected:
+                    raise PermissionError(f"Cannot delete protected directory: {target_path}")
                 if os.path.isdir(target_path):
                     shutil.rmtree(target_path)
                 else:
@@ -193,7 +197,12 @@ class FileManager(BasePanel):
 
     def on_delete_clicked(self):
         path = self.path_input.text().strip()
-        if not path or path == os.path.expanduser("~"):
+        if not path:
+            return
+        normalized = os.path.realpath(path)
+        protected = {"/", "/root", "/home", "/etc", "/usr", "/var", "/bin", "/sbin", "/boot", "/sys", "/proc", "/dev", os.path.realpath(os.path.expanduser("~"))}
+        if normalized in protected:
+            self.preview.setText(f"[SECURITY] Cannot delete protected directory: {path}")
             return
             
         self.delete_btn.setEnabled(False)

@@ -36,18 +36,33 @@ chroot_or_host apt-get install -y --no-install-recommends \
     2>/dev/null || chroot_or_host apt-get install -y dkms build-essential git bc linux-headers-generic
 
 # aircrack-ng rtl8812au (commonly used injection NIC family)
-BUILD=/tmp/xeno-oot-wifi
-rm -rf "$BUILD"
-mkdir -p "$BUILD"
-cd "$BUILD"
-git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git
-cd rtl8812au
-# DKMS install when possible
-if command -v dkms >/dev/null 2>&1; then
-    make dkms_install || make && make install
+if [ "$TARGET_ROOT" != "/" ]; then
+    echo "Building OOT Wi-Fi driver inside ROOTFS chroot..."
+    BUILD="$TARGET_ROOT/tmp/xeno-oot-wifi"
+    rm -rf "$BUILD"
+    mkdir -p "$BUILD"
+    git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git "$BUILD/rtl8812au"
+    KVER=$(ls "$TARGET_ROOT/lib/modules" 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
+    if [ -n "$KVER" ] && [ -d "$TARGET_ROOT/lib/modules/$KVER/build" ]; then
+        chroot "$TARGET_ROOT" bash -c "cd /tmp/xeno-oot-wifi/rtl8812au && make KVER=$KVER KSRC=/lib/modules/$KVER/build -j\$(nproc) && make KVER=$KVER KSRC=/lib/modules/$KVER/build install" || echo "WARNING: OOT wifi build failed, continuing..."
+    else
+        echo "Skipping OOT WiFi build (no headers directory found for $KVER inside rootfs)."
+    fi
+    rm -rf "$BUILD"
 else
-    make -j"$(nproc)"
-    make install
+    BUILD=/tmp/xeno-oot-wifi
+    rm -rf "$BUILD"
+    mkdir -p "$BUILD"
+    cd "$BUILD"
+    git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git
+    cd rtl8812au
+    # DKMS install when possible
+    if command -v dkms >/dev/null 2>&1; then
+        make dkms_install || make && make install
+    else
+        make -j"$(nproc)"
+        make install
+    fi
 fi
 
 echo "✓ OOT driver install attempted. Reboot and check: lsmod | grep 88XXau"
