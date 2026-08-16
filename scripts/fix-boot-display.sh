@@ -28,17 +28,20 @@ echo "  ✓ Conflicting services disabled"
 # ── 2. Scoped realtime limits (not world-writable RT) ────────
 echo "[2/4] Setting up scoped security limits for Hyprland..."
 mkdir -p "$ROOTFS/etc/security/limits.d"
-# Create hyprland group membership for live user
-if [ -f "$ROOTFS/etc/group" ] && ! grep -q '^hyprland:' "$ROOTFS/etc/group"; then
-    # Use a high GID unlikely to collide
-    echo "hyprland:x:991:xeno" >> "$ROOTFS/etc/group"
-fi
-if [ -f "$ROOTFS/etc/group" ] && grep -q '^xeno:' "$ROOTFS/etc/group"; then
-    # ensure xeno in hyprland group
-    if ! grep -q '^hyprland:.*xeno' "$ROOTFS/etc/group"; then
-        sed -i 's/^hyprland:x:\([0-9]*\):.*/hyprland:x:\1:xeno/' "$ROOTFS/etc/group" 2>/dev/null || true
+# Ensure critical hardware and display groups have xeno membership
+for grp in input render video kvm audio tty plugdev netdev sudo hyprland; do
+    if [ -f "$ROOTFS/etc/group" ]; then
+        if grep -q "^${grp}:" "$ROOTFS/etc/group"; then
+            if ! grep -q "^${grp}:.*xeno" "$ROOTFS/etc/group"; then
+                sed -i "/^${grp}:/ s/$/,xeno/" "$ROOTFS/etc/group"
+                sed -i "s/:,xeno/:xeno/" "$ROOTFS/etc/group"
+            fi
+        else
+            echo "${grp}:x:995:xeno" >> "$ROOTFS/etc/group"
+        fi
     fi
-fi
+done
+
 cat > "$ROOTFS/etc/security/limits.d/99-hyprland.conf" << 'LIMITS_EOF'
 # Scoped RT privileges — NOT '*' (that was a security loophole)
 @hyprland soft rtprio 99
@@ -102,6 +105,11 @@ echo "[3/4] Writing updated xeno-start-hyprland..."
 cat > "$ROOTFS/usr/bin/xeno-start-hyprland" << 'LAUNCHER_EOF'
 #!/bin/bash
 # ─── Xeno OS — Hyprland Session Launcher ─────────────────────
+set -e
+
+export USER="${USER:-xeno}"
+export HOME="${HOME:-/home/xeno}"
+export LOGNAME="${LOGNAME:-xeno}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 if [ ! -d "$XDG_RUNTIME_DIR" ]; then
     mkdir -p "$XDG_RUNTIME_DIR"
@@ -112,22 +120,28 @@ export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=Hyprland
 export XDG_CURRENT_DESKTOP=Hyprland
 export MOZ_ENABLE_WAYLAND=1
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"
-export GDK_BACKEND="${GDK_BACKEND:-wayland}"
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland;xcb}"
+export GDK_BACKEND="${GDK_BACKEND:-wayland,x11,*}"
+export CLUTTER_BACKEND=wayland
+export SDL_VIDEODRIVER=wayland
+
 # Wine / Windows apps on Wayland+XWayland
 export WINEESYNC="${WINEESYNC:-1}"
 export WINEFSYNC="${WINEFSYNC:-1}"
 
 force_software() {
     echo "[xeno-start-hyprland] Software rendering enabled ($1)"
-    export WLR_RENDERER=pixman
     export WLR_NO_HARDWARE_CURSORS=1
     export LIBGL_ALWAYS_SOFTWARE=1
-    export __GLX_VENDOR_LIBRARY_NAME=mesa
-    export MESA_LOADER_DRIVER_OVERRIDE=softpipe
-    export WLR_RENDERER_ALLOW_SOFTWARE=1
     export GALLIUM_DRIVER=llvmpipe
+    export __GLX_VENDOR_LIBRARY_NAME=mesa
+    export WLR_RENDERER_ALLOW_SOFTWARE=1
+    export WLR_RENDERER=gles2
+    export AQ_FORCE_SOFTWARE=1
+    export AQ_NO_MODIFIERS=1
+    export HYPRLAND_NO_SD_NOTIFY=1
     export HYPRLAND_NO_RT=1
+    unset MESA_LOADER_DRIVER_OVERRIDE || true
 }
 
 # Kernel cmdline opt: xeno.safegraphics=1
@@ -153,14 +167,38 @@ else
     esac
 fi
 
+# Ensure user config directory exists
+mkdir -p "$HOME/.config/hypr"
+if [ ! -f "$HOME/.config/hypr/hyprland.conf" ] && [ -f /etc/skel/.config/hypr/hyprland.conf ]; then
+    cp -f /etc/skel/.config/hypr/hyprland.conf "$HOME/.config/hypr/hyprland.conf"
+fi
+
 echo "[xeno-start-hyprland] Starting Hyprland..."
+RUN_CMD="/usr/bin/Hyprland --config $HOME/.config/hypr/hyprland.conf"
 if [ -x /usr/bin/start-hyprland ]; then
-    exec /usr/bin/start-hyprland --config /home/xeno/.config/hypr/hyprland.conf
+    RUN_CMD="/usr/bin/start-hyprland --config $HOME/.config/hypr/hyprland.conf"
+fi
+
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    exec dbus-run-session -- $RUN_CMD
 else
-    exec /usr/bin/Hyprland --config /home/xeno/.config/hypr/hyprland.conf
+    exec $RUN_CMD
 fi
 LAUNCHER_EOF
 chmod +x "$ROOTFS/usr/bin/xeno-start-hyprland"
+
+# ── 3.4 Sync live user skeleton configs ───────────────────────
+mkdir -p "$ROOTFS/etc/skel/.config/hypr" "$ROOTFS/home/xeno/.config/hypr"
+if [ -f "$ROOTFS/home/xeno/.config/hypr/hyprland.conf" ]; then
+    cp -f "$ROOTFS/home/xeno/.config/hypr/hyprland.conf" "$ROOTFS/etc/skel/.config/hypr/hyprland.conf"
+fi
+if [ -f "$ROOTFS/home/xeno/.profile" ]; then
+    cp -f "$ROOTFS/home/xeno/.profile" "$ROOTFS/etc/skel/.profile"
+fi
+if [ -d "$ROOTFS/home/xeno/desktop" ]; then
+    mkdir -p "$ROOTFS/etc/skel/desktop"
+    cp -rf "$ROOTFS/home/xeno/desktop"/* "$ROOTFS/etc/skel/desktop/" 2>/dev/null || true
+fi
 
 # ── 3.5 Serial Console Autologin for QEMU / headless terminal ──
 echo "[3.5/4] Configuring serial console autologin on ttyS0..."

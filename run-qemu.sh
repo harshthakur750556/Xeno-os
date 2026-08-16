@@ -1,14 +1,26 @@
 #!/bin/bash
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "6.0")
-ISO_PATH="$WS_DIR/iso/output/xeno_os-${BUILD_VER}-alpha.iso"
+BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "7.0")
+ISO_PATH=""
+CANDIDATE_PATHS=(
+    "$WS_DIR/iso/output/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
+    "$WS_DIR/iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso"
+    "$WS_DIR/iso/output/xeno_os-${BUILD_VER}-alpha.iso"
+    "$WS_DIR/iso/output/xeno_os-${BUILD_VER}.iso"
+    "/mnt/c/Users/harsh/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
+    "/mnt/c/Users/harsh/BETA VERSION/xeno_os-${BUILD_VER}.iso"
+    "/mnt/c/Users/harsh/xeno_os-${BUILD_VER}-alpha.iso"
+)
 
-if [ ! -f "$ISO_PATH" ] && [ -f "/mnt/c/Users/harsh/xeno_os-${BUILD_VER}-alpha.iso" ]; then
-    ISO_PATH="/mnt/c/Users/harsh/xeno_os-${BUILD_VER}-alpha.iso"
-fi
+for p in "${CANDIDATE_PATHS[@]}"; do
+    if [ -f "$p" ]; then
+        ISO_PATH="$p"
+        break
+    fi
+done
 
-if [ ! -f "$ISO_PATH" ]; then
-    LATEST_ISO=$(ls "$WS_DIR/iso/output"/xeno_os-*.iso /mnt/c/Users/harsh/xeno_os-*.iso 2>/dev/null | tail -n 1 || true)
+if [ -z "$ISO_PATH" ] || [ ! -f "$ISO_PATH" ]; then
+    LATEST_ISO=$(ls "$WS_DIR/iso/output"/ALPHA\ VERSION/xeno_os-*.iso "$WS_DIR/iso/output"/BETA\ VERSION/xeno_os-*.iso "$WS_DIR/iso/output"/xeno_os-*.iso /mnt/c/Users/harsh/ALPHA\ VERSION/xeno_os-*.iso /mnt/c/Users/harsh/xeno_os-*.iso 2>/dev/null | tail -n 1 || true)
     if [ -n "$LATEST_ISO" ]; then
         ISO_PATH="$LATEST_ISO"
     fi
@@ -53,6 +65,7 @@ if [ "$MODE" = "gui" ]; then
       -cpu max \
       "${BIOS_ARGS[@]}" \
       -vga virtio \
+      -usb -device usb-tablet \
       -cdrom "$ISO_PATH" \
       -boot d
 else

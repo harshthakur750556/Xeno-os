@@ -20,7 +20,6 @@ def init_qt_environment():
         os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
         os.environ.setdefault("QT_QUICK_BACKEND", "software")
         os.environ.setdefault("GALLIUM_DRIVER", "llvmpipe")
-        os.environ.setdefault("MESA_LOADER_DRIVER_OVERRIDE", "softpipe")
         os.environ.setdefault("QTWEBENGINE_DISABLE_GPU", "1")
         os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer=false")
 

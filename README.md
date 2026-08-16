@@ -6,7 +6,7 @@
 
 # XENO OS — Next-Generation Hybrid Scientific & Security Platform
 
-> **XENO OS (v6.0-ALPHA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
+> **XENO OS (v7.0-ALPHA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
 
 ---
 
@@ -43,6 +43,62 @@
 | **Live Boot & ISO Engine** | Casper Live Overlay (`boot=casper`), ZSTD Level 19 1MB-block SquashFS, GRUB ISO Level 3 (`XENOOS`) |
 | **Diagnostic & Auto-Heal** | [`scripts/master-doctor.sh`](file:///home/xeno/Xeno-os/scripts/master-doctor.sh) (8-Tier audit engine with `--fix` self-healing) |
 | **Test Verification** | 96 Automated Tests (73 E2E Integration + 23 Adversarial IPC boundary tests) |
+
+---
+
+## 🏛️ Xeno OS Release Tier Classification
+
+Xeno OS is distributed across three distinct edition tiers tailored to different computing paradigms:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       XENO OS RELEASE TIERS & EDITIONS                                   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+       │                                           │                                           │
+       ▼                                           ▼                                           ▼
+ ┌───────────────┐                           ┌───────────────┐                           ┌───────────────┐
+ │ ALPHA VERSION │                           │ BETA VERSION  │                           │ OMEGA VERSION │
+ └───────┬───────┘                           └───────┬───────┘                           └───────┬───────┘
+         │                                           │                                           │
+   [ Base Core ]                               [ Desktop GUI ]                             [ Gold Master ]
+   - No Graphical GUI                          - Hyprland Wayland                          - Calamares Installer
+   - Headless Terminal Mode                    - Astal v2 / Bun Shell                      - Full Offline Drivers
+   - XanMod 6.12+ BORE Kernel                  - PySide6 Workspace                         - Local AI Orchestration
+   - ZRAM In-Memory Swap                       - Universal App GUI                         - Enterprise Hardening
+   - CLI Compatibility Stack                   - Hardware GL Acceleration                  - Production Stable
+         │                                           │                                           │
+         ▼                                           ▼                                           ▼
+  iso/output/ALPHA VERSION/                   iso/output/BETA VERSION/                    iso/output/OMEGA VERSION/
+```
+
+### 1. 🔵 ALPHA VERSION — Base OS Core (Headless / Without GUI)
+* **Target Output**: `iso/output/ALPHA VERSION/`
+* **Architecture**: Core Ubuntu 24.04 LTS (Noble) minimal debootstrap + Custom XanMod 6.12+ BORE EEVDF low-latency kernel + in-memory ZRAM Zstandard compressed swap.
+* **Included Stack**:
+  - Full Linux CLI networking, WiFi packet injection kernel patches (`mac80211`), and security driver layer.
+  - Universal CLI execution runners (`xeno-windows`, `xeno-wifi-monitor`, `xeno-tor-proxy`).
+  - Serial console autologin (`ttyS0`) and virtual terminal autologin (`tty1`).
+* **Ideal For**: Lightweight server deployments, automated headless CI/CD test harnesses, minimal hypervisors, and terminal-only security audits.
+
+### 2. 🟣 BETA VERSION — Interactive Cyber-Nord Desktop (With GUI)
+* **Target Output**: `iso/output/BETA VERSION/`
+* **Architecture**: Everything in the Alpha base + full graphical hardware-accelerated Wayland display stack.
+* **Included Stack**:
+  - **Hyprland Wayland Compositor**: Shader-accelerated tiling window manager with dynamic LLVMpipe software rasterizer fallback for VMs.
+  - **Astal v2 / Bun Shell**: Real-time Cyber-Nord top bar, fuzzy application search launcher (`Super+Space`), and interactive notification center.
+  - **PySide6 Scientific Suite**: Modular multi-threaded computational workspace (SymPy Calculus, Pandas Analytics, Code IDE, SciPy DSP, VTK 3D).
+  - **Universal App GUI**: Seamless windowed execution for Windows (`.exe`/`.msi`), Android (`.apk`), AppImages, and Debian packages.
+* **Ideal For**: Interactive daily driving, scientific computation, graphical security simulation, and multimedia/gaming workloads.
+
+### 3. 🟢 OMEGA VERSION — Final Stable Gold Master (Enterprise Edition)
+* **Target Output**: `iso/output/OMEGA VERSION/`
+* **Architecture**: Everything in the Beta edition + comprehensive offline hardware ecosystem, automated system installer, and local AI orchestration.
+* **Included Stack**:
+  - **Calamares GUI System Installer**: Automated graphical bare-metal installation to NVMe/SSD/HDD with custom Btrfs/EXT4 subvolume partitioning.
+  - **Offline Battery-Included Drivers**: Pre-compiled DKMS binary modules for out-of-tree Realtek/MediaTek adapters, NVIDIA proprietary drivers, and Bluetooth chipsets.
+  - **Local AI Agent Engine (`xeno-ai-engine`)**: Offline Ollama/llama.cpp runtime with Bubblewrap container sandboxing.
+  - **Production Security Hardening**: Scoped PAM realtime limits, unprivileged user namespaces isolation, and firewall autotuning.
+* **Ideal For**: Enterprise workstations, mission-critical scientific laboratories, and zero-compromise penetration testing deployments.
 
 ---
 
@@ -244,13 +300,31 @@ Xeno-os/
 Xeno OS allows running applications across virtually any format seamlessly:
 
 ```
-                            ┌────────────────────────┐
-                            │   XENO RUN SUBSYSTEM   │
-                            └───────────┬────────────┘
-           ┌──────────────┬─────────────┼─────────────┬──────────────┐
-           ▼              ▼             ▼             ▼              ▼
-       [.apk]        [.exe / .msi]  [.AppImage]    [.deb]      [.iso / VM]
-    (Waydroid AOSP)  (Wine + DXVK)  (Direct FUSE) (Apt / Dpkg) (QEMU / KVM)
+                                   ┌────────────────────────────────────────────────────────┐
+                                   │           XENO OS UNIVERSAL EXECUTION ENGINE           │
+                                   └───────────────────────────┬────────────────────────────┘
+                                                               │
+            ┌───────────────────┬──────────────────────────────┼──────────────────────────────┬───────────────────┐
+            ▼                   ▼                              ▼                              ▼                   ▼
+       [.exe / .msi]         [.apk]                       [.AppImage]                       [.deb]             [.iso]
+      (Windows Stack)    (Android AOSP)                (FUSE Standalone)                (Native Linux)      (Hypervisor)
+            │                   │                              │                              │                   │
+      Wine Staging +      Waydroid LXC                   libfuse2 FUSE                   APT / Dpkg Base     Hardware KVM
+       DXVK / VKD3D      Kernel Binder                  User-Space Mount                + Pinned Kali Repo    + QEMU Virt
+            │                   │                              │                              │                   │
+      Direct3D→Vulkan    SurfaceFlinger                  Zero-Install                    Native ELF64        Full Hardware
+       NTSYNC Kernel     Wayland Buffers                 Direct Execution                glibc 2.39 Bin      Virtualization
+            │                   │                              │                              │                   │
+            └───────────────────┴──────────────────────────────┼──────────────────────────────┴───────────────────┘
+                                                               │
+                                                               ▼
+                                    ┌─────────────────────────────────────────────────────┐
+                                    │        CUSTOM XANMOD 6.12+ LOW-LATENCY KERNEL       │
+                                    │   - BORE EEVDF Scheduler (1000Hz Timer Frequency)   │
+                                    │   - CONFIG_NTSYNC & PREEMPT Real-Time Multitasking  │
+                                    │   - ZRAM In-Memory Compressed Swap (zstd 50% RAM)   │
+                                    │   - Hyprland Wayland Hardware Compositor            │
+                                    └─────────────────────────────────────────────────────┘
 ```
 
 - **Windows Software (`.exe`, `.msi`)**:

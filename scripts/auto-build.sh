@@ -13,14 +13,27 @@ else
     BUILD_VERSION="4.0"
 fi
 
-ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
-TARGET_ISO="$WS_DIR/iso/output/${ISO_NAME}"
+if [[ "$BUILD_VERSION" =~ beta|BETA ]]; then
+    TIER_NAME="BETA VERSION"
+    ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
+elif [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
+    TIER_NAME="OMEGA VERSION"
+    ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
+else
+    TIER_NAME="ALPHA VERSION"
+    ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
+fi
+
+OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
+mkdir -p "$OUTPUT_DIR" "$WS_DIR/iso/output/BETA VERSION"
+TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
 WIN_HOST_DIR="/mnt/c/Users/harsh"
 
-# Clean up all older ISO and SHA256 versions across WSL & Windows host
-find "$WS_DIR/iso/output" -mindepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
+# Clean up all older ISO and SHA256 versions across WSL & Windows host within the tier
+find "$OUTPUT_DIR" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
 if [ -d "$WIN_HOST_DIR" ]; then
-    find "$WIN_HOST_DIR" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
+    mkdir -p "$WIN_HOST_DIR/$TIER_NAME" "$WIN_HOST_DIR/BETA VERSION" 2>/dev/null || true
+    find "$WIN_HOST_DIR/$TIER_NAME" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
 fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
@@ -308,12 +321,18 @@ menuentry "Xeno OS Live (Safe graphics)" {
 }
 EOF
 
-# ── 7.5 Smart Lean Optimization (Strip caches, bytecode & temp data) ──
-echo "Optimizing rootfs footprint (purging temporary build caches, bytecode, and obsolete headers)..."
+# ── 7.5 Smart Lean Optimization (Strip caches, bytecode & heavy redundant blobs) ──
+echo "Optimizing rootfs footprint (purging temporary build caches, bytecode, CUDA bundles, and obsolete headers)..."
 rm -rf "$ROOTFS/root/.cache" "$ROOTFS/root/.npm" "$ROOTFS/root/.cargo/registry" 2>/dev/null || true
 rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* 2>/dev/null || true
 rm -rf "$ROOTFS/tmp"/* "$ROOTFS/var/tmp"/* "$ROOTFS/var/log"/* 2>/dev/null || true
-rm -rf "$ROOTFS/usr/src/linux-headers-6.8.0-124"* "$ROOTFS/usr/src/linux-headers-6.8.0-136"* 2>/dev/null || true
+rm -rf "$ROOTFS/usr/src/linux-headers-"* 2>/dev/null || true
+# Strip pre-bundled 2GB static CUDA runtimes (Ollama pulls them on-demand if Nvidia GPU is present)
+rm -rf "$ROOTFS/usr/local/lib/ollama/cuda_v12" "$ROOTFS/usr/local/lib/ollama/cuda_v13" 2>/dev/null || true
+# Clean only empty stale module directories (preserve all valid module trees for safe boot)
+find "$ROOTFS/usr/lib/modules" -mindepth 1 -maxdepth 1 -type d -empty -delete 2>/dev/null || true
+# Purge non-essential locale packs in Flatpak runtimes
+rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*.Locale 2>/dev/null || true
 find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
 
@@ -328,7 +347,11 @@ mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
     -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
     -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
     -e "root/.cache/*" "root/.npm/*" "root/.cargo/registry/*" \
-    -e "usr/share/doc/*" "usr/share/man/*" \
+    -e "home/*/.cache/*" \
+    -e "usr/share/doc/*" "usr/share/man/*" "usr/share/info/*" "usr/share/help/*" \
+    -e "usr/include/*" "usr/src/*" \
+    -e "usr/local/lib/ollama/cuda_*" \
+    -e "var/lib/flatpak/runtime/*/*.Locale/*" \
     -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
     -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
 
@@ -359,9 +382,9 @@ if [ -d "/usr/lib/grub/x86_64-efi" ]; then
     fi
 fi
 
-echo "Generating bootable ISO (${ISO_NAME})..."
-mkdir -p "$WS_DIR/iso/output"
-LOCAL_ISO_PATH="$WS_DIR/iso/output/${ISO_NAME}"
+echo "Generating bootable ISO (${ISO_NAME}) in ${TIER_NAME}..."
+mkdir -p "$OUTPUT_DIR"
+LOCAL_ISO_PATH="$OUTPUT_DIR/${ISO_NAME}"
 
 grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
     -volid "$VOLUME_ID" \
@@ -369,11 +392,19 @@ grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
 
 # Generate SHA256 checksum for ISO artifact validation
 echo "Generating SHA256 checksum..."
-(cd "$WS_DIR/iso/output" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
+(cd "$OUTPUT_DIR" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
+
+# Maintain root output convenience symlink
+ln -sf "$LOCAL_ISO_PATH" "$WS_DIR/iso/output/${ISO_NAME}" 2>/dev/null || true
+ln -sf "${LOCAL_ISO_PATH}.sha256" "$WS_DIR/iso/output/${ISO_NAME}.sha256" 2>/dev/null || true
 
 if [ -d "$WIN_HOST_DIR" ]; then
-    echo "Copying ISO artifact to Windows host directory ($WIN_HOST_DIR/${ISO_NAME})..."
-    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || dd if="$LOCAL_ISO_PATH" of="$WIN_HOST_DIR/${ISO_NAME}" bs=64M conv=fsync 2>/dev/null || true
+    mkdir -p "$WIN_HOST_DIR/$TIER_NAME" 2>/dev/null || true
+    echo "Copying ISO artifact to Windows host directory ($WIN_HOST_DIR/$TIER_NAME/${ISO_NAME})..."
+    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" 2>/dev/null || dd if="$LOCAL_ISO_PATH" of="$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" bs=64M conv=fsync 2>/dev/null || true
+    cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}.sha256" 2>/dev/null || true
+    # Also copy root mirror
+    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || true
     cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/${ISO_NAME}.sha256" 2>/dev/null || true
 fi
 
