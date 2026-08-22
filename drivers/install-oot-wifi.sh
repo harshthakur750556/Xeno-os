@@ -41,12 +41,15 @@ if [ "$TARGET_ROOT" != "/" ]; then
     BUILD="$TARGET_ROOT/tmp/xeno-oot-wifi"
     rm -rf "$BUILD"
     mkdir -p "$BUILD"
-    git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git "$BUILD/rtl8812au"
-    KVER=$(ls "$TARGET_ROOT/lib/modules" 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
-    if [ -n "$KVER" ] && [ -d "$TARGET_ROOT/lib/modules/$KVER/build" ]; then
-        chroot "$TARGET_ROOT" bash -c "cd /tmp/xeno-oot-wifi/rtl8812au && make KVER=$KVER KSRC=/lib/modules/$KVER/build -j\$(nproc) && make KVER=$KVER KSRC=/lib/modules/$KVER/build install" || echo "WARNING: OOT wifi build failed, continuing..."
+    if git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git "$BUILD/rtl8812au" 2>/dev/null; then
+        KVER=$(ls "$TARGET_ROOT/lib/modules" 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
+        if [ -n "$KVER" ] && [ -d "$TARGET_ROOT/lib/modules/$KVER/build" ]; then
+            chroot "$TARGET_ROOT" bash -c "cd /tmp/xeno-oot-wifi/rtl8812au && make KVER=$KVER KSRC=/lib/modules/$KVER/build -j\$(nproc) && make KVER=$KVER KSRC=/lib/modules/$KVER/build install" || echo "WARNING: OOT wifi build failed, continuing..."
+        else
+            echo "Skipping OOT WiFi build (no headers directory found for $KVER inside rootfs)."
+        fi
     else
-        echo "Skipping OOT WiFi build (no headers directory found for $KVER inside rootfs)."
+        echo "WARNING: Could not clone rtl8812au repository (network offline or host unreachable). Skipping OOT WiFi build."
     fi
     rm -rf "$BUILD"
 else

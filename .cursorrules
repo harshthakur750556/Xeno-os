@@ -60,24 +60,39 @@ Every model processing this workspace must strictly adhere to the following exec
 Xeno-os/
 ├── .github/workflows/         # GitHub Actions kernel CI pipeline (build-kernel.yml)
 ├── desktop/                  # PySide6 scientific panels + TypeScript Astal shell + theme tokens
-│   ├── app.py                # Main desktop application entry point
 │   ├── env.py                # Virtual machine software graphics fallback guard
 │   ├── theme.py              # Central Python visual theme tokens (Single Source of Truth)
+│   ├── app.py                # Main desktop application entry point
+│   ├── workspace.py          # Multi-panel scientific workspace host
+│   ├── filemanager.py        # Cyber-Nord file explorer with root guardrails
+│   ├── loginscreen.py        # Session display lock/login manager
+│   ├── settings.py           # Desktop preferences & theme customizer
+│   ├── avatar_controller.py  # Interactive desktop assistant interface
 │   ├── shell/                # Astal v2 / Bun TypeScript desktop shell (Bar, Launcher, Notifications)
 │   └── panels/               # Scientific panels (BasePanel, Math, Data, Code, 3D, Signal)
-├── drivers/                  # Out-of-tree WiFi driver packages (RTL8812AU, RTL8821CE, etc.)
-├── iso/                      # ISO build directory (build/casper/, output/)
-├── kernel/                   # XanMod kernel build scripts, patches (0001, 0002, 0003), cache/
-├── rootfs/                   # Ubuntu 24.04 LTS root filesystem artifact
-├── scripts/                  # Build automation, chroot, doctor, and boot-fix scripts
+├── drivers/                  # Hardware & wireless driver scripts (README.md, install-oot-wifi.sh)
+├── iso/                      # ISO build directory (build/casper/, output/ALPHA, output/BETA, version.txt)
+├── kernel/                   # XanMod patches (0001, 0002, 0003), configs, cache/, build-kernel.sh, validate-kernel-deb.sh
+├── rootfs/                   # Ubuntu 24.04 LTS (Noble) root filesystem artifact
+├── scripts/                  # Build automation, chroot, doctor, compat, AI, and boot-fix scripts
 │   ├── auto-build.sh         # Main automated ISO packaging pipeline (ZSTD L19 + Level 3)
 │   ├── master-doctor.sh      # Master 8-tier diagnostic and self-healing doctor
 │   ├── fix-boot-display.sh   # Display manager conflict resolution & VM launcher
+│   ├── setup-compat-stack.sh # Windows (Wine/DXVK/Bottles) compatibility installer
+│   ├── setup-security-tools.sh# Kali tools, pinned repo, and injection helpers
+│   ├── setup-ai.sh           # Ollama local LLM runtime and sandbox setup
+│   ├── fix-kernel-rootfs.sh  # Kernel installation into rootfs
+│   ├── stage-kernel-debs.sh  # Stages locally compiled kernels into cache/
+│   ├── install-astal-chroot.sh# Astal shell & Bun dependencies chroot installer
+│   ├── enter-rootfs.sh       # Interactive chroot mount tool
 │   └── lib-chroot.sh         # Chroot mount/unmount library
-├── tests/                    # E2E & adversarial test suite (96 total test cases)
+├── tests/                    # E2E & adversarial test suite (96 total test cases, simulator.py)
 ├── .cursorrules              # Core engineering guidelines (this file)
+├── .editorconfig             # Global code style and formatting configuration
 ├── AGENTS.md                 # AI agent quick reference & critical path rules
 ├── CHANGELOG.md              # System revision history and chronological activity log
+├── run-qemu.sh               # Fast QEMU test runner (--gui or --terminal)
+├── xorriso-wrapper.sh        # ISO Level 3 oversized image injection wrapper
 └── README.md                 # Complete system architecture and user documentation
 ```
 
@@ -136,17 +151,22 @@ The Kali Linux rolling repository is pinned to priority 100 in `/etc/apt/prefere
 All visual tokens reside in `desktop/theme.py` (Python) and `desktop/shell/theme.ts` (TypeScript):
 
 ```python
-# Cyber-Nord Primary Color Palette
-bg           = "#0A0E14"   # Deep Space Navy Background Base
-surface      = "#121824"   # Primary Card/Panel Surface Container
-surface_2    = "#1A2234"   # Elevated Controls & Hover Backgrounds
-border       = "#222F46"   # Crisp Divider & Component Borders
-accent       = "#00F0FF"   # Neon Cyan Primary Accent
-accent_2     = "#7000FF"   # Cyber Violet Secondary Accent
-accent_hover = "#00FFA3"   # Neon Mint Interactive Glow
-text         = "#ECEFF4"   # High-Contrast Body Text
-text_dim     = "#8892B0"   # Secondary Diagnostic Labels & Metadata
-text_muted   = "#4C566A"   # Disabled Controls & Muted Hints
+# Cyber-Nord Primary Color Palette (Single Source of Truth: desktop/theme.py)
+bg           = "#0c0d12"   # Deep Black/Slate Background Base
+surface      = "#161821"   # Deep Slate Panel Container
+surface_2    = "#222533"   # Elevated Controls & Hover Backgrounds
+border       = "#2f3448"   # Subtle Divider & Component Borders
+border_glow  = "#bc13fe40" # Accent Border Glow (Neon Purple, 25% opacity)
+accent       = "#88c0d0"   # Frost Blue Primary Accent
+accent_2     = "#bc13fe"   # Neon Purple Secondary Accent
+accent_hover = "#00ffff"   # Neon Cyan Interactive Hover
+text         = "#eceff4"   # Crisp White High-Contrast Body Text
+text_dim     = "#a0a8b6"   # Muted Blue-Gray Secondary & Placeholder
+text_muted   = "#5e657a"   # Disabled Controls & Muted Hints
+success      = "#a3be8c"   # Nord Green Success Accent
+warning      = "#ebcb8b"   # Nord Yellow Warning Accent
+error        = "#bf616a"   # Nord Red Error Accent
+overlay      = "#000000b0" # Semi-transparent Overlay (70% Black)
 ```
 
 ---

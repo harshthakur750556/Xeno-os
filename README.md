@@ -38,7 +38,7 @@
 | **Android App Execution** | Waydroid AOSP Subsystem sharing Linux kernel binder & Wayland display buffers |
 | **Linux Standalone Apps** | Direct FUSE 2/3 runtime (`libfuse2t64`) for zero-install `.AppImage` execution + Flatpak/Flathub |
 | **Security & Pentest Stack** | Kali `mac80211` & `cfg80211` packet injection patches + Pinned Kali Rolling repo (`Priority: 100`) |
-| **Wireless Adapter Drivers** | 7 staged out-of-tree DKMS drivers: Realtek (`RTL8812AU`, `RTL8821CE`, `RTL88x2BU`, `RTL8188EUS`, `RTL8814AU`) & MediaTek (`MT7612U`, `MT7610U`) |
+| **Wireless Adapter Drivers** | Broad in-tree kernel drivers (Intel `iwlwifi`, Atheros `ath9k`/`ath10k`, MediaTek `mt76`, Realtek `rtw88`/`89`, Broadcom) + Realtek injection DKMS installer ([`drivers/install-oot-wifi.sh`](file:///home/xeno/Xeno-os/drivers/install-oot-wifi.sh)) |
 | **Local AI Engine & Sandbox** | `xeno-ai-engine` (Ollama/llama.cpp @ `/var/cache/xeno-ai/models`) + Bubblewrap (`bwrap`) isolation |
 | **Live Boot & ISO Engine** | Casper Live Overlay (`boot=casper`), ZSTD Level 19 1MB-block SquashFS, GRUB ISO Level 3 (`XENOOS`) |
 | **Diagnostic & Auto-Heal** | [`scripts/master-doctor.sh`](file:///home/xeno/Xeno-os/scripts/master-doctor.sh) (8-Tier audit engine with `--fix` self-healing) |
@@ -235,13 +235,19 @@ Xeno-os/
 │   ├── loginscreen.py          # Session display lock/login manager
 │   ├── settings.py             # Desktop system preferences & theme customizer
 │   ├── avatar_controller.py    # Interactive desktop assistant interface
+│   ├── avatar_viewer.html      # 3D Avatar WebGL viewer template
+│   ├── assets/                 # Desktop visual icons and SVG assets
+│   ├── themes/                 # Supplemental theme presets and palettes
 │   ├── shell/                  # Astal v2 / Bun TypeScript desktop shell
 │   │   ├── app.ts              # Astal application entry point
 │   │   ├── state.ts            # Reactive IPC client & telemetry store
 │   │   ├── Bar.ts              # Status bar with CPU/RAM/clock/workspaces
 │   │   ├── Launcher.ts         # Fast fuzzy application grid launcher
 │   │   ├── Notifications.ts    # Floating notification toast center
-│   │   └── theme.ts            # TypeScript visual tokens (mirror of theme.py)
+│   │   ├── theme.ts            # TypeScript visual tokens (mirror of theme.py)
+│   │   ├── sandbox.sh          # Sandboxed desktop shell launcher
+│   │   ├── trigger.py          # Status bar & launcher IPC trigger utility
+│   │   └── package.json        # Bun package definition & Astal dependencies
 │   └── panels/                 # PySide6 scientific computational panels
 │       ├── base_panel.py       # Threaded BasePanel & BaseWorker foundation
 │       ├── math_panel.py       # SymPy symbolic calculus & equation solver
@@ -249,17 +255,13 @@ Xeno-os/
 │       ├── code_panel.py       # Live syntax-highlighted code executor
 │       ├── signal_panel.py     # SciPy DSP, FFT, and Butterworth filters
 │       └── threed_panel.py     # VTK 3D geometry & parametric renderer
-├── drivers/                    # Staged out-of-tree Wi-Fi DKMS driver packages
-│   ├── rtl8812au/              # Realtek RTL8812AU / RTL8821AU driver
-│   ├── rtl8821ce/              # Realtek RTL8821CE PCIe Wi-Fi driver
-│   ├── rtl88x2bu/              # Realtek RTL88x2BU USB Wi-Fi driver
-│   ├── rtl8188eus/             # Realtek RTL8188EUS injection driver
-│   ├── rtl8814au/              # Realtek RTL8814AU high-power injection driver
-│   ├── mt7612u/                # MediaTek MT7612U dual-band USB driver
-│   └── mt7610u/                # MediaTek MT7610U 802.11ac driver
+├── drivers/                    # Hardware driver packages & setup scripts
+│   ├── README.md               # Hardware & wireless driver technical manual
+│   └── install-oot-wifi.sh     # Realtek (rtl8812au) out-of-tree DKMS installer
 ├── iso/                        # ISO build artifacts and output
 │   ├── build/casper/           # Live boot filesystem (SquashFS location)
-│   └── output/                 # Generated ISO images and SHA256 checksums
+│   ├── output/                 # Generated ISO images (ALPHA, BETA, OMEGA)
+│   └── version.txt             # Target build version string (e.g. 7.0)
 ├── kernel/                     # XanMod kernel sources, patches, and build scripts
 │   ├── configs/                # xeno.config.fragment (BORE, NTSYNC, 1000Hz, WLAN)
 │   ├── patches/                # 0001 (mac80211), 0002 (cfg80211), 0003 (usb injection)
@@ -276,14 +278,17 @@ Xeno-os/
 │   ├── setup-ai.sh             # Ollama local LLM runtime and sandbox setup
 │   ├── fix-kernel-rootfs.sh    # Kernel installation into rootfs
 │   ├── stage-kernel-debs.sh    # Stages locally compiled kernels into cache/
+│   ├── install-astal-chroot.sh # Astal shell and Bun dependencies installer
 │   ├── enter-rootfs.sh         # Interactive chroot mount tool
 │   └── lib-chroot.sh           # Shared chroot mount/unmount utility library
 ├── tests/                      # Automated test suite (96 tests)
 │   ├── run_tests.py            # Test suite runner (Simulation & Live modes)
 │   ├── test_e2e.py             # 73 E2E Integration and UX scenario tests
 │   ├── test_adversarial.py     # 23 Adversarial IPC boundary & stress tests
-│   └── simulator.py            # Headless mock display server & IPC simulator
+│   ├── simulator.py            # Headless mock display server & IPC simulator
+│   └── bin/                    # Test mock runner wrappers
 ├── .cursorrules                # AI engineer rules & memory log
+├── .editorconfig               # Editor code style & whitespace rules
 ├── AGENTS.md                   # AI developer guidelines & critical path constraints
 ├── CHANGELOG.md                # System revision history and activity log
 ├── run-qemu.sh                 # Fast QEMU test runner (--gui or --terminal)
@@ -373,8 +378,9 @@ Subclassed under [`BasePanel`](file:///home/xeno/Xeno-os/desktop/panels/base_pan
 1. **Kernel Packet Injection**:
    - Custom patches in `net/mac80211/tx.c` enable raw IEEE 802.11 frame injection and custom sequence numbering.
    - Patches in `net/wireless/chan.c` permit dynamic channel switching while monitor VIFs are active.
-2. **Out-of-Tree Driver Support**:
-   - 7 staged DKMS modules in `drivers/` for RTL8812AU, RTL8821CE, RTL88x2BU, RTL8188EUS, RTL8814AU, MT7612U, and MT7610U.
+2. **Hardware & Wireless Driver Architecture**:
+   - Comprehensive in-tree driver support compiled into the custom XanMod kernel for major chipsets (Intel `iwlwifi`, Atheros `ath9k`/`ath10k`, MediaTek `mt76`, Realtek `rtw88`/`rtw89`, Broadcom `brcmfmac`, Ralink `rt2800usb`, ZyDAS `zd1211rw`).
+   - Dedicated out-of-tree DKMS installer ([`drivers/install-oot-wifi.sh`](file:///home/xeno/Xeno-os/drivers/install-oot-wifi.sh)) for Realtek `rtl8812au`/`rtl8821au` USB injection adapters against matching installed kernel headers.
 3. **Pinned Kali Repository**:
    - Configured with `Pin-Priority: 100` in `/etc/apt/preferences.d/kali-pinning` to allow selective installation of Kali security tools without overriding the stable Ubuntu Noble base.
 4. **Pre-Installed Tools & Utilities**:

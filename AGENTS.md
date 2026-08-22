@@ -34,10 +34,17 @@ Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kerne
 | `sudo bash scripts/master-doctor.sh --fix` | Master Doctor in self-healing mode (automatically repairs discovered issues) |
 | `sudo bash scripts/auto-build.sh` | Full Smart Lean ISO packaging pipeline (ZSTD L19 1MB-block SquashFS + Level 3 GRUB ISO) |
 | `bash run-qemu.sh --gui` | Run built ISO in QEMU with graphical Wayland display window |
-| `bash run-qemu.sh --terminal` | Run built ISO in QEMU in headless serial console mode |
+| `bash run-qemu.sh --terminal` | Run built ISO in QEMU in headless serial console mode (ttyS0 autologin) |
+| `bash kernel/validate-kernel-deb.sh kernel/cache` | Validates kernel packages for WLAN, preemption, and driver modules |
 | `bash scripts/stage-kernel-debs.sh` | Validates and stages locally compiled kernel packages from `kernel/output/` into `kernel/cache/` |
+| `sudo bash scripts/fix-kernel-rootfs.sh` | Repairs and installs validated custom XanMod kernel packages into rootfs |
 | `sudo bash scripts/fix-boot-display.sh` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher |
-| `sudo bash scripts/enter-rootfs.sh` | Interactive chroot into rootfs |
+| `sudo bash scripts/install-astal-chroot.sh` | Installs Bun and Astal desktop shell dependencies inside rootfs chroot |
+| `sudo bash scripts/setup-compat-stack.sh` | Configures Wine Staging, DXVK, VKD3D-Proton, and Windows compatibility layer |
+| `sudo bash scripts/setup-security-tools.sh` | Configures Kali pinned repo (priority 100), wireless tools, and injection utilities |
+| `sudo bash scripts/setup-ai.sh` | Configures Ollama local AI runtime and Bubblewrap agent sandbox |
+| `sudo bash drivers/install-oot-wifi.sh` | Builds and installs Realtek rtl8812au out-of-tree injection DKMS module |
+| `sudo bash scripts/enter-rootfs.sh` | Interactive chroot into rootfs with safe mount/trap handling |
 
 ---
 
@@ -84,14 +91,27 @@ Total Test Count: **96 tests** (73 E2E Integration tests + 23 Adversarial bounda
 ```
 Xeno-os/
 ├── desktop/          # PySide6 panels + TypeScript Astal shell + theme tokens (theme.py/theme.ts) + env.py
-├── drivers/          # Hardware driver packages & setup (Realtek/MediaTek DKMS)
-├── iso/              # ISO build directory (build/casper/, output/)
-├── kernel/           # XanMod kernel patches, build scripts, GitHub CI output
-├── rootfs/           # Ubuntu 24.04 debootstrap root filesystem
-├── scripts/          # Packaging, doctor, chroot, and boot-fix shell scripts
-├── tests/            # Automated test suites (96 tests across E2E & Adversarial)
+│   ├── env.py        # VM software graphics fallback initialization
+│   ├── theme.py      # Python visual tokens (Single Source of Truth)
+│   ├── app.py        # Desktop suite main entry point
+│   ├── workspace.py  # Multi-panel scientific workspace host
+│   ├── filemanager.py# Cyber-Nord file explorer with root guardrails
+│   ├── loginscreen.py# Session lock/login manager
+│   ├── settings.py   # Desktop preferences & theme customizer
+│   ├── avatar_controller.py # Multimodal AI avatar UI daemon
+│   ├── shell/        # Astal v2 / Bun TypeScript shell (Bar, Launcher, Notifications, theme.ts)
+│   └── panels/       # Scientific panels (Math, Data, Code, Signal, 3D VTK)
+├── drivers/          # Hardware & wireless driver scripts (README.md, install-oot-wifi.sh)
+├── iso/              # ISO build directory (build/casper/, output/ALPHA, output/BETA, version.txt)
+├── kernel/           # XanMod patches (0001, 0002, 0003), configs, cache/, build-kernel.sh, validate-kernel-deb.sh
+├── rootfs/           # Ubuntu 24.04 LTS (Noble) debootstrap root filesystem
+├── scripts/          # Packaging, doctor, chroot, compat, AI, and boot-fix shell scripts
+├── tests/            # Automated test suites (96 tests across E2E & Adversarial, simulator.py)
 ├── .cursorrules      # Core engineering guidelines & revision logs
+├── .editorconfig     # Global formatting & indentation rules
 ├── AGENTS.md         # Developer & AI agent instructions
 ├── CHANGELOG.md      # Chronological revision history & activity log
-└── README.md         # Cyber-Nord design specification & user manual
+├── run-qemu.sh       # Fast QEMU test runner (--gui or --terminal)
+├── xorriso-wrapper.sh# ISO Level 3 oversized image injection wrapper
+└── README.md         # Cyber-Nord design specification & master technical manual
 ```

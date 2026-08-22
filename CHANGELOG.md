@@ -215,5 +215,26 @@ All AI agents and developers MUST automatically append new session briefings to 
   * Executed `scripts/master-doctor.sh`: 47/47 checks passed with 0 failures across all 8 tiers, certifying system health as OPTIMAL.
   * Executed `python3 -m unittest discover -s tests -p 'test_*.py'`: All 73 E2E tests and 23 Adversarial tests passed cleanly with 0 errors and 0 failures.
 
+---
+
+### August 22, 2026 - Session 15 Briefing
+- **Primary Objective**: 
+  * Perform comprehensive cross-checking and synchronization of `README.md`, `AGENTS.md`, `drivers/README.md`, `.cursorrules`, and `Temp.md`.
+  * Correct outdated and inaccurate information regarding wireless driver architecture (distinguishing in-tree XanMod chipsets from out-of-tree Realtek injection DKMS drivers).
+  * Align visual design tokens in `.cursorrules` with the Single Source of Truth (`desktop/theme.py` & `desktop/shell/theme.ts`).
+  * Fix offline network handling in `drivers/install-oot-wifi.sh` to prevent `XENO_STRICT_BUILD=1` pipeline failure when GitHub is offline.
+  * Synchronize project directory maps, primary diagnostic commands, and test verification stats (96 automated tests) across all technical documentation.
+- **Changes Made**:
+  * `README.md`: Updated System Specifications, Offensive Security section, and Repository Map to accurately document in-tree kernel drivers (Intel, Atheros, MediaTek, Realtek, Broadcom) alongside `drivers/install-oot-wifi.sh` (RTL8812AU/RTL8821AU DKMS), and added missing files (`avatar_viewer.html`, `sandbox.sh`, `trigger.py`, `install-astal-chroot.sh`, `version.txt`, `.editorconfig`).
+  * `AGENTS.md`: Expanded Primary Management table with all setup scripts (`setup-compat-stack.sh`, `setup-security-tools.sh`, `setup-ai.sh`, `install-astal-chroot.sh`, `validate-kernel-deb.sh`), and updated the project directory map.
+  * `drivers/README.md`: Completely updated technical manual explaining in-tree kernel chipsets, Kali packet injection patch series, out-of-tree DKMS compilation against Xeno headers, and post-boot verification (`xeno-wifi-monitor doctor`).
+  * `drivers/install-oot-wifi.sh`: Wrapped `git clone` with an error handler to gracefully skip or warn instead of aborting the entire build pipeline when network is unreachable.
+  * `.cursorrules`: Aligned Section 6 color tokens to exact hex definitions in `desktop/theme.py` and synchronized Section 3 filesystem map.
+- **Verification & Test Outcome**:
+  * Ran `python3 tests/run_tests.py`: 73/73 E2E Integration tests passed with 0 errors and 0 failures.
+  * Ran `python3 -m unittest tests/test_adversarial.py`: 23/23 Adversarial IPC boundary tests passed with 0 errors and 0 failures (Total: 96/96 tests passing).
+  * Ran `bash scripts/master-doctor.sh`: 45 checks passed with 0 failures across all 8 tiers, verifying OPTIMAL system status.
+
+
 
 
