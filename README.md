@@ -154,65 +154,81 @@ To maintain the ~450MB idle footprint, Xeno OS removes heavy Canonical telemetry
 
 ```mermaid
 graph TD
-    subgraph KERNEL ["Layer 1: Low-Latency Kernel & Hardware Abstraction"]
+    subgraph KERNEL["Layer 1: Low-Latency Kernel and Hardware Abstraction"]
         K1["Custom XanMod 6.12+ Kernel Source"]
-        K2["BORE EEVDF Scheduler + PREEMPT (1000Hz)"]
+        K2["BORE EEVDF Scheduler and PREEMPT 1000Hz"]
         K3["NTSYNC Kernel Synchronization Primitive"]
-        K4["Kali mac80211 / cfg80211 Packet Injection Patches"]
-        K5["Out-of-Tree Wi-Fi DKMS (RTL8812AU, RTL8821CE, MT7612U...)"]
-        K6["ZRAM In-Memory Compressed Swap (zstd, 50% RAM)"]
-        K1 --> K2 & K3 & K4 & K5 & K6
+        K4["Kali mac80211 / cfg80211 Frame Injection Patches"]
+        K5["Out-of-Tree Wi-Fi DKMS RTL8812AU / RTL8821AU"]
+        K6["ZRAM In-Memory Compressed Swap zstd 50% RAM"]
+        K1 --> K2
+        K1 --> K3
+        K1 --> K4
+        K1 --> K5
+        K1 --> K6
     end
 
-    subgraph BOOT ["Layer 2: Base System & ISO Packaging Subsystem"]
-        B1["Ubuntu 24.04 LTS (Noble) Minimal RootFS"]
-        B2["Casper Live Overlay (Smart Lean ZSTD L19 SquashFS)"]
-        B3["GRUB Bootloader (boot=casper, Volume ID: XENOOS)"]
-        B4["Xorriso Wrapper (-iso-level 3 for >4GB Images)"]
-        B1 --> B2 --> B3 --> B4
+    subgraph BOOT["Layer 2: Base System and ISO Packaging Subsystem"]
+        B1["Ubuntu 24.04 LTS Noble Minimal RootFS"]
+        B2["Casper Live Overlay Smart Lean ZSTD L19 SquashFS"]
+        B3["GRUB Bootloader boot=casper Volume ID: XENOOS"]
+        B4["Xorriso Wrapper -iso-level 3 for Large Images"]
+        B1 --> B2
+        B2 --> B3
+        B3 --> B4
     end
 
-    subgraph DISPLAY ["Layer 3: Display Server & Hardware Adaptive Layer"]
+    subgraph DISPLAY["Layer 3: Display Server and Hardware Adaptive Layer"]
         G1["xeno-start-hyprland Session Launcher"]
-        G2["Hardware / VM Auto-Detector (systemd-detect-virt)"]
-        G3["Mesa Software Renderer (kms_swrast / llvmpipe / LIBGL_ALWAYS_SOFTWARE)"]
+        G2["Hardware / VM Auto-Detector systemd-detect-virt"]
+        G3["Mesa Software Renderer kms_swrast / llvmpipe"]
         G4["Hyprland Wayland Hardware Compositor"]
         G1 --> G2
-        G2 -->|Virtual Machine| G3 --> G4
-        G2 -->|Bare Metal GPU| G4
+        G2 --> G3
+        G2 --> G4
+        G3 --> G4
     end
 
-    subgraph SHELL ["Layer 4: Desktop Shell & System Telemetry (Astal v2 / Bun)"]
+    subgraph SHELL["Layer 4: Desktop Shell and System Telemetry Astal v2 / Bun"]
         S1["Bun Runtime Engine"]
         S2["Astal v2 GTK3 Binding Framework"]
-        S3["Top Status Bar (Bar.ts) — Live CPU/RAM/Workspace Telemetry"]
-        S4["Cyber App Launcher (Launcher.ts) — App Registry & Launch Matrix"]
-        S5["Notification Toast Engine (Notifications.ts) — Non-blocking alerts"]
-        S6["Global Reactive IPC Socket (/tmp/xeno-shell.sock)"]
-        S1 --> S2 --> S3 & S4 & S5
-        S6 <--> S3 & S4 & S5
+        S3["Top Status Bar Bar.ts — Live CPU/RAM/Telemetry"]
+        S4["Cyber App Launcher Launcher.ts — App Matrix"]
+        S5["Notification Toast Engine Notifications.ts"]
+        S6["Global Reactive IPC Socket /tmp/xeno-ipc.sock"]
+        S1 --> S2
+        S2 --> S3
+        S2 --> S4
+        S2 --> S5
+        S6 --- S3
+        S6 --- S4
+        S6 --- S5
     end
 
-    subgraph APPS ["Layer 5: Universal Cross-Platform Execution Stack"]
-        C1["Wine Staging + DXVK + VKD3D (Windows .exe / .msi)"]
-        C2["Waydroid AOSP Container (Android .apk)"]
-        C3["FUSE 2/3 Runtime (Linux .AppImage)"]
-        C4["APT / DPkg Native Package Engine (Debian .deb)"]
-        C5["Flatpak Container Engine (Flathub .flatpak)"]
-        C6["QEMU / KVM Hardware Hypervisor (Live .iso)"]
-        C7["Local AI Engine (xeno-ai-engine / Ollama / bwrap sandbox)"]
+    subgraph APPS["Layer 5: Universal Cross-Platform Execution Stack"]
+        C1["Wine Staging + DXVK + VKD3D Windows Apps"]
+        C2["Waydroid AOSP Container Android Apps"]
+        C3["FUSE 2/3 Runtime Linux AppImage"]
+        C4["APT / DPkg Native Package Engine Debian"]
+        C5["Flatpak Container Engine Flathub"]
+        C6["QEMU / KVM Hardware Hypervisor Live ISO"]
+        C7["Local AI Engine xeno-ai-engine / Ollama"]
     end
 
-    subgraph WORKSPACE ["Layer 6: System & Security Suites"]
+    subgraph WORKSPACE["Layer 6: System and Security Suites"]
         W1["Kitty GPU-Accelerated Terminal"]
         W2["Native Cyber File Explorer"]
         W3["Chrome / Firefox Web Browser"]
-        W4["WiFi Packet Injection Suite (aircrack-ng, xeno-wifi-monitor)"]
-        W5["Windows Compatibility Layer (Wine Staging, Bottles)"]
-        W6["Offensive Security: Wireshark, Metasploit, Nmap, Tor"]
+        W4["WiFi Packet Injection Suite aircrack-ng"]
+        W5["Windows Compatibility Layer Wine / Bottles"]
+        W6["Offensive Security: Wireshark, Metasploit, Tor"]
     end
 
-    KERNEL --> BOOT --> DISPLAY --> SHELL --> APPS --> WORKSPACE
+    K1 --> B1
+    B4 --> G1
+    G4 --> S1
+    S2 --> C1
+    S2 --> W1
 ```
 
 ![Cyber Divider](assets/cyber-divider.svg)
