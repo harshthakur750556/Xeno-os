@@ -61,7 +61,7 @@ echo "Workspace: $WS_DIR"
 
 # ── 0. Boot display / session fixes ──────────────────────────
 echo "Applying boot display fixes..."
-bash "$WS_DIR/scripts/fix-boot-display.sh"
+bash "$WS_DIR/scripts/xeno-reaper.sh" fix-boot
 
 # ── 1. GitHub auth (for kernel release download) ─────────────
 ACTUAL_USER="${SUDO_USER:-xeno}"
@@ -85,7 +85,7 @@ REMOTE_TAG=""
 # First check if fresh local build exists in kernel/output
 if ls "$WS_DIR/kernel/output"/linux-image-*.deb &>/dev/null; then
     echo "Found local kernel build in kernel/output. Staging..."
-    bash "$WS_DIR/scripts/stage-kernel-debs.sh" || true
+    bash "$WS_DIR/scripts/xeno-reaper.sh" stage-kernel || true
 fi
 
 RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
@@ -150,10 +150,10 @@ fi
 # ── 4. Repair / install kernel into rootfs ───────────────────
 if [ "$KERNEL_VALID" = "1" ]; then
     # Use validated debs
-    bash "$WS_DIR/scripts/fix-kernel-rootfs.sh"
+    bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel
 else
     # Purge broken custom kernels; keep generic
-    XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/fix-kernel-rootfs.sh" || true
+    XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel || true
 fi
 
 # ── 5. Sync desktop & install feature stacks ─────────────────
@@ -175,10 +175,9 @@ rsync -a --delete \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
     --exclude='*.pyo' \
-    --exclude='.pytest_cache' \
     --exclude='.git' \
-    "$WS_DIR/tests/" "$ROOTFS/home/xeno/tests/"
-chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/tests" 2>/dev/null || true
+    "$WS_DIR/scripts/" "$ROOTFS/home/xeno/scripts/"
+chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/scripts" 2>/dev/null || true
 
 # Clean up developer history files so they do not leak into ISO
 rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
@@ -201,13 +200,13 @@ if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
     }
 
     if [ ! -x "$ROOTFS/usr/bin/xeno-windows" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "Windows compatibility stack" bash "$WS_DIR/scripts/setup-compat-stack.sh"
+        run_feature_step "Windows compatibility stack" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-compat
     fi
     if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "Security/wireless tools" bash "$WS_DIR/scripts/setup-security-tools.sh"
+        run_feature_step "Security/wireless tools" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-security
     fi
     if [ ! -x "$ROOTFS/usr/bin/xeno-ai-engine" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "AI Engine" bash "$WS_DIR/scripts/setup-ai.sh"
+        run_feature_step "AI Engine" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-ai
     fi
     if [ -x "$WS_DIR/drivers/install-oot-wifi.sh" ]; then
         run_feature_step "OOT WiFi drivers" env XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh"

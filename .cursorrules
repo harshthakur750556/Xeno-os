@@ -69,19 +69,10 @@ Xeno-os/
 ├── iso/                      # ISO build directory (build/casper/, output/ALPHA, output/BETA, version.txt)
 ├── kernel/                   # XanMod patches (0001, 0002, 0003), configs, cache/, build-kernel.sh, validate-kernel-deb.sh
 ├── rootfs/                   # Ubuntu 24.04 LTS (Noble) root filesystem artifact
-├── scripts/                  # Build automation, chroot, doctor, compat, AI, and boot-fix scripts
-│   ├── auto-build.sh         # Main automated ISO packaging pipeline (ZSTD L19 + Level 3)
-│   ├── master-doctor.sh      # Master 8-tier diagnostic and self-healing doctor
-│   ├── fix-boot-display.sh   # Display manager conflict resolution & VM launcher
-│   ├── setup-compat-stack.sh # Windows (Wine/DXVK/Bottles) compatibility installer
-│   ├── setup-security-tools.sh# Kali tools, pinned repo, and injection helpers
-│   ├── setup-ai.sh           # Ollama local LLM runtime and sandbox setup
-│   ├── fix-kernel-rootfs.sh  # Kernel installation into rootfs
-│   ├── stage-kernel-debs.sh  # Stages locally compiled kernels into cache/
-│   ├── install-astal-chroot.sh# Astal shell & Bun dependencies chroot installer
-│   ├── enter-rootfs.sh       # Interactive chroot mount tool
-│   └── lib-chroot.sh         # Chroot mount/unmount library
-├── tests/                    # E2E & adversarial test suite (96 total test cases, simulator.py)
+├── scripts/                  # Unified OS management & ISO packaging suite
+│   ├── xeno-reaper.sh        # Master Command Center (Interactive TUI, Doctor, Embedded 96-Test Suite, & Setup Modules)
+│   ├── auto-build.sh         # Smart Lean ISO packaging pipeline (ZSTD L19 + Level 3)
+│   └── lib-chroot.sh         # Shared chroot mount/unmount utility library
 ├── .cursorrules              # Core engineering guidelines (this file)
 ├── .editorconfig             # Global code style and formatting configuration
 ├── AGENTS.md                 # AI agent quick reference & critical path rules
@@ -172,16 +163,19 @@ Execute the full 96-test automated verification suite:
 
 ```bash
 # Run Master Doctor System Diagnostic & Auto-Healer (8 Tiers)
-bash scripts/master-doctor.sh
+bash scripts/xeno-reaper.sh doctor
 
 # Run Master Doctor with Automatic Issue Remediation
-sudo bash scripts/master-doctor.sh --fix
+sudo bash scripts/xeno-reaper.sh --fix
+
+# Run All 96 Automated Tests (73 E2E Integration + 23 Adversarial IPC)
+bash scripts/xeno-reaper.sh test-all
 
 # Run E2E Integration Suite (73 Tests)
-python3 tests/run_tests.py
+bash scripts/xeno-reaper.sh test-e2e
 
 # Run Adversarial Boundary Suite (23 Tests)
-python3 -m unittest tests/test_adversarial.py
+bash scripts/xeno-reaper.sh test-adv
 ```
 
 ---

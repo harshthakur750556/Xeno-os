@@ -9,6 +9,87 @@
 This file contains the complete, detailed, timestamped development activity log for Xeno OS.
 All AI agents and developers MUST automatically append new session briefings to this file upon making changes.
 
+### August 23, 2026 - Session 20 Briefing: Native Test Suite Embedding & Banner Glyph Correction
+- **Primary Objective**:
+  * Correct the ASCII art banner 'X' character in `scripts/xeno-reaper.sh` for visual symmetry.
+  * Consolidate and embed all test suite files from `tests/` (`simulator.py`, `test_adversarial.py`, `test_e2e.py`, `run_tests.py`, and mock binary wrappers) natively into `scripts/xeno-reaper.sh`.
+  * Purge the obsolete `tests/` folder to achieve a lean, self-contained single-command script architecture.
+  * Update `scripts/auto-build.sh`, `README.md`, `AGENTS.md`, and `.cursorrules` accordingly.
+- **Changes Made**:
+  * **ASCII Banner Art Correction (`scripts/xeno-reaper.sh`)**:
+    - Fixed the third row of the 'X' glyph in both the file header comment and the `print_banner()` runtime terminal function from `─░█░█─` to `░█──░█`, ensuring perfect visual symmetry with the top row.
+  * **Native Test Framework & Simulator Integration (`scripts/xeno-reaper.sh`)**:
+    - Embedded `XenoSystemSimulator` (in-process multi-threaded Unix domain socket server at `/tmp/xeno-ipc.sock` with atomic locks and comprehensive command dispatching).
+    - Embedded dynamic mock CLI binary factory (`create_mock_binaries()`) generating `xeno-launcher`, `xeno-notify`, `xeno-sandbox`, and `xeno-status-bar` into a temporary `PATH` directory.
+    - Embedded `XenoAdversarialTestCase` (all 23 adversarial IPC boundary, malformed payload, extreme memory parsing, negative thread count, and rapid flood tests).
+    - Embedded `XenoE2ETestCase` (all 73 end-to-end integration and UX scenario tests covering status bar, launcher grid, toast center, Bubblewrap sandbox, and theme conformity).
+    - Integrated direct dispatch inside `run_tests_suite()` (`all`, `e2e`, `adv`, `live`) and hooked Master Doctor Tier 7 directly into the embedded test runner.
+  * **Repository Pruning & Packaging Update**:
+    - Safely deleted the `tests/` directory (`run_tests.py`, `simulator.py`, `test_adversarial.py`, `test_e2e.py`, and `tests/bin/`).
+    - Updated `scripts/auto-build.sh` to sync `scripts/` instead of `tests/` into the live user home directory.
+  * **Documentation & Guideline Updates**:
+    - `README.md`: Updated test badge target, repository directory tree, and test execution instructions.
+    - `AGENTS.md`: Updated test execution commands table and file map.
+    - `.cursorrules`: Synchronized directory structure and verification suite command references.
+- **Verification & Diagnostic Outcome**:
+  * Executed `bash scripts/xeno-reaper.sh test-all`: All 96 tests (73 E2E Integration + 23 Adversarial IPC) passed cleanly with exit code 0 in ~25.5s.
+  * Executed `bash scripts/xeno-reaper.sh doctor`: 8-Tier diagnostic completed with 33 passed checks, 0 failed checks, System Health Status: **OPTIMAL**.
+
+---
+
+### August 23, 2026 - Session 19 Briefing: Master Script Unification (Xeno Reaper) & System Hardening
+- **Primary Objective**:
+  * Consolidate all maintenance, diagnostic, staging, setup, and chroot scripts into a single unified master command center: `scripts/xeno-reaper.sh`.
+  * Embed an interactive Cyber-Nord TUI menu and comprehensive CLI subcommand interface.
+  * Integrate full 96-test automated test suite execution (73 E2E Integration + 23 Adversarial IPC tests) directly into `xeno-reaper.sh`.
+  * Implement background periodic health check systemd service and timer (`xeno-health.service` & `xeno-health.timer`).
+  * Harden Astal v2 desktop shell IPC lifecycle, socket security, and process exit handlers.
+  * Implement direct `.exe` / `.msi` execution in `xeno-windows`, FUSE-adaptive `xeno-appimage-runner`, and privacy-guarded opt-in `xeno-ai` utility.
+  * Purge redundant standalone script files while keeping `auto-build.sh` (ISO packaging pipeline) and `lib-chroot.sh`.
+- **Changes Made**:
+  * **Master Suite (`scripts/xeno-reaper.sh`)**:
+    - Created single master command center containing all operations: Master Doctor (8 tiers), Master Doctor `--fix` (self-healing), Fast Health Check, Full Test Suite Runner (`all`, `e2e`, `adv`, `live`), Boot & Display Fix, Kernel Staging & RootFS Repair, Windows/AppImage Compatibility Setup, Kali Security & Wireless Setup, Opt-in Local AI Engine Setup, and Interactive RootFS Chroot.
+    - Implemented Cyber-Nord ASCII art header banner and interactive terminal UI selection menu.
+    - Added CLI arguments for non-interactive automation: `doctor`, `doctor-fix`, `health`, `test-all`, `test-e2e`, `test-adv`, `test-live`, `fix-boot`, `stage-kernel`, `fix-kernel`, `setup-compat`, `setup-security`, `setup-ai`, `chroot`, `build-iso`.
+  * **Automated Health Monitoring (`scripts/xeno-reaper.sh` -> `/usr/bin/xeno-health-check`)**:
+    - Installed `/usr/bin/xeno-health-check` auditing rootfs storage, unconfigured dpkg states (`dpkg -l | awk '$1 ~ /U|H|R|F/'`), DKMS module statuses, failed systemd units, and stale `/tmp` lock files.
+    - Configured `/etc/systemd/system/xeno-health.service` and `/etc/systemd/system/xeno-health.timer` running periodically every 2 hours with `Persistent=true`.
+  * **Desktop Shell Socket Hardening (`desktop/shell/app.ts`)**:
+    - Added graceful process signal handlers (`SIGINT`, `SIGTERM`, `exit`) to automatically remove `/tmp/xeno-ipc.sock` on shutdown.
+    - Protected socket peer credential verification and wrapped JSON parsing in defensive error recovery traps, ensuring malformed payloads never crash the Bun runtime.
+  * **Cross-Platform Compatibility & Direct Execution (`scripts/xeno-reaper.sh`)**:
+    - Updated `xeno-windows` to directly execute specified binary files (`xeno-windows /path/to/app.exe`).
+    - Added `xeno-wine-runner.desktop` registered for `application/x-ms-dos-executable` and `application/x-msi`.
+    - Created `/usr/bin/xeno-appimage-runner` with automatic `/dev/fuse` accessibility detection and fallback to `--appimage-extract-and-run` for restricted VM/container environments, plus associated `xeno-appimage-runner.desktop`.
+  * **Opt-In Local AI Engine & Privacy Guard (`scripts/xeno-reaper.sh`)**:
+    - Guaranteed zero background surveillance and zero external data leakage; strictly bound to `127.0.0.1:11434` (offline local loopback).
+    - Made `xeno-ai-engine.service` disabled by default on boot to conserve memory.
+    - Added `/usr/bin/xeno-ai` CLI control utility (`status`, `start`, `stop`, `enable`, `disable`, `run <model>`, `list`).
+  * **Repository Cleanup & Script Unification**:
+    - Updated `scripts/auto-build.sh` to route all maintenance actions through `xeno-reaper.sh` subcommands.
+    - Deleted redundant script files: `enter-rootfs.sh`, `fix-boot-display.sh`, `fix-kernel-rootfs.sh`, `install-astal-chroot.sh`, `master-doctor.sh`, `purge-extra-apps.sh`, `setup-ai.sh`, `setup-beta-apps.sh`, `setup-compat-stack.sh`, `setup-security-tools.sh`, `stage-kernel-debs.sh`, `streamline-apps.sh`, `xeno-health-check.sh`.
+    - Retained `scripts/auto-build.sh` (ISO packaging pipeline), `scripts/lib-chroot.sh` (chroot mount helpers), and `scripts/xeno-reaper.sh` (Master suite).
+  * **Documentation Synchronization**:
+    - Updated `README.md`, `AGENTS.md`, and `CHANGELOG.md` with complete details on `xeno-reaper.sh` commands, interactive menu, and updated repository structure.
+- **Verification & Diagnostic Outcome**:
+  * Executed `bash scripts/xeno-reaper.sh health`: Clean pass (0 issues found).
+  * Executed `bash scripts/xeno-reaper.sh test-all`: 96/96 tests passed (73 E2E Integration + 23 Adversarial IPC tests).
+  * Executed `bash scripts/xeno-reaper.sh doctor`: 46 passed checks, 0 failed checks, System Health Status: **OPTIMAL**.
+
+---
+
+### August 23, 2026 - Session 7 Briefing: Beta Architectural Proving Ground & Application Streamlining
+- **Primary Objective**: Establish the Beta Version as the core architectural & kernel refinement proving ground, eliminate heavy monolithic ISO bloat, curate a modern lightweight starter application suite, and implement the on-demand `xeno-install` modular suite manager.
+- **Changes Made**:
+  * `scripts/streamline-apps.sh`: Automated pipeline purging ~2GB+ of heavy non-essential workstation bloat (Blender, Kdenlive, Krita, Octave, TeX Live, Arduino, Audacity, LibreOffice, Tor Browser, stale KDE frameworks) and installing lightweight starter applications (`thunar`, `micro`, `mousepad`, `celluloid`, `mpv`, `eog`, `evince`, `file-roller`, `pavucontrol`, `btop`, `fastfetch`, `fonts-jetbrains-mono`).
+  * `rootfs/usr/bin/xeno-install`: Created modular on-demand suite installer supporting one-click presets (`creative`, `office`, `dev`, `science`, `pentest`, `ai`, `gaming`) and universal fallback across APT & Flatpak.
+  * `rootfs/usr/share/applications/defaults.list`: Configured clean, modern Wayland MIME associations and cleaned up orphaned `.desktop` files.
+  * `README.md`: Comprehensively redesigned the release tier classification to establish Beta as the internal architecture and kernel proving ground, added the systematic OS flaw eradication matrix, documented self-evolving autonomous loops (`master-doctor.sh --fix`, `xeno-autotune`), and added the OS comparison benchmark matrix.
+  * `desktop/shell/state.ts` & `desktop/shell/Launcher.ts`: Verified and aligned launcher standard applications.
+- **Diagnostics & Verification**:
+  * Ran 8-Tier Master Doctor (`scripts/master-doctor.sh`): 45 Checks Passed, 0 Failed, System Health Status: OPTIMAL.
+  * Automated Test Suites: 96/96 Tests Passed (73 E2E Integration tests + 23 Adversarial IPC boundary tests).
+
 ---
 
 ### July 2, 2026 - Session 1 Briefing

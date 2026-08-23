@@ -21,13 +21,21 @@ export interface Application {
 }
 
 export const standardApps: Application[] = [
-  { id: "terminal", name: "Terminal", exec: "kitty", icon: "utilities-terminal" },
-  { id: "files", name: "Files", exec: "nautilus || thunar || pcmanfm", icon: "system-file-manager" },
-  { id: "browser", name: "Browser", exec: "google-chrome-stable || firefox || chromium", icon: "web-browser" },
-  { id: "wifi", name: "WiFi Tools", exec: "xeno-wifi-monitor", icon: "network-wireless" },
-  { id: "security", name: "Security Suite", exec: "kitty -e msfconsole", icon: "security-high" },
-  { id: "windows", name: "Windows App Layer", exec: "xeno-windows", icon: "application-x-executable" },
-  { id: "settings", name: "Settings", exec: "gnome-control-center || kitty -e nmtui", icon: "preferences-system" }
+  { id: "terminal", name: "Kitty Terminal", exec: "kitty", icon: "utilities-terminal" },
+  { id: "editor", name: "Micro Editor", exec: "kitty -e micro", icon: "accessories-text-editor" },
+  { id: "python", name: "Python SciStack", exec: "jupyter-qtconsole || python3 -m qtconsole || kitty -e python3", icon: "text-x-python" },
+  { id: "octave", name: "GNU Octave", exec: "octave --gui", icon: "org.octave.Octave" },
+  { id: "gimp", name: "GIMP Image Editor", exec: "gimp", icon: "gimp" },
+  { id: "inkscape", name: "Inkscape Vector", exec: "inkscape", icon: "org.inkscape.Inkscape" },
+  { id: "writer", name: "LibreOffice Writer", exec: "libreoffice --writer", icon: "libreoffice-writer" },
+  { id: "calc", name: "LibreOffice Calc", exec: "libreoffice --calc", icon: "libreoffice-calc" },
+  { id: "wireshark", name: "Wireshark", exec: "wireshark", icon: "org.wireshark.Wireshark" },
+  { id: "wifi", name: "WiFi Monitor", exec: "xeno-wifi-monitor", icon: "network-wireless" },
+  { id: "btop", name: "Btop Monitor", exec: "kitty -e btop", icon: "utilities-system-monitor" },
+  { id: "htop", name: "Htop Monitor", exec: "kitty -e htop", icon: "utilities-system-monitor" },
+  { id: "mpv", name: "MPV Media Player", exec: "mpv --player-operation-mode=pseudo-gui", icon: "multimedia-video-player" },
+  { id: "fastfetch", name: "Fastfetch", exec: "kitty -e fastfetch", icon: "system-help" },
+  { id: "settings", name: "Network & Audio", exec: "nm-connection-editor || pavucontrol", icon: "preferences-system" }
 ];
 
 // Live State Variables

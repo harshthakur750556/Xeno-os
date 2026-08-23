@@ -30,39 +30,39 @@ Custom Linux distribution (Ubuntu 24.04 / Noble) featuring a custom XanMod kerne
 
 | Command | Purpose |
 |---|---|
-| `bash scripts/master-doctor.sh` | 8-Tier comprehensive system diagnostic, test suite runner, and integrity verifier |
-| `sudo bash scripts/master-doctor.sh --fix` | Master Doctor in self-healing mode (automatically repairs discovered issues) |
+| `bash scripts/xeno-reaper.sh` | Interactive Cyber-Nord Command Center menu |
+| `bash scripts/xeno-reaper.sh doctor` | 8-Tier comprehensive system diagnostic, test runner, & integrity verifier |
+| `sudo bash scripts/xeno-reaper.sh --fix` | Master Doctor in self-healing mode (automatically repairs discovered issues) |
+| `bash scripts/xeno-reaper.sh health` | Fast periodic health and sanity audit |
+| `bash scripts/xeno-reaper.sh test-all` | Run all 96 automated tests (73 E2E Integration + 23 Adversarial) |
 | `sudo bash scripts/auto-build.sh` | Full Smart Lean ISO packaging pipeline (ZSTD L19 1MB-block SquashFS + Level 3 GRUB ISO) |
 | `bash run-qemu.sh --gui` | Run built ISO in QEMU with graphical Wayland display window |
 | `bash run-qemu.sh --terminal` | Run built ISO in QEMU in headless serial console mode (ttyS0 autologin) |
-| `bash kernel/validate-kernel-deb.sh kernel/cache` | Validates kernel packages for WLAN, preemption, and driver modules |
-| `bash scripts/stage-kernel-debs.sh` | Validates and stages locally compiled kernel packages from `kernel/output/` into `kernel/cache/` |
-| `sudo bash scripts/fix-kernel-rootfs.sh` | Repairs and installs validated custom XanMod kernel packages into rootfs |
-| `sudo bash scripts/fix-boot-display.sh` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher |
-| `sudo bash scripts/install-astal-chroot.sh` | Installs Bun and Astal desktop shell dependencies inside rootfs chroot |
-| `sudo bash scripts/setup-compat-stack.sh` | Configures Wine Staging, DXVK, VKD3D-Proton, and Windows compatibility layer |
-| `sudo bash scripts/setup-security-tools.sh` | Configures Kali pinned repo (priority 100), wireless tools, and injection utilities |
-| `sudo bash scripts/setup-ai.sh` | Configures Ollama local AI runtime and Bubblewrap agent sandbox |
+| `sudo bash scripts/xeno-reaper.sh fix-boot` | Resolves GDM conflicts, sets up systemd autostart, and installs software renderer launcher |
+| `sudo bash scripts/xeno-reaper.sh stage-kernel` | Validates and stages locally compiled kernel packages from `kernel/output/` into `kernel/cache/` |
+| `sudo bash scripts/xeno-reaper.sh fix-kernel` | Repairs and installs validated custom XanMod kernel packages into rootfs |
+| `sudo bash scripts/xeno-reaper.sh setup-compat` | Configures Wine Staging, DXVK, Bottles, and AppImage compatibility runners |
+| `sudo bash scripts/xeno-reaper.sh setup-security` | Configures Kali pinned repo (priority 100), wireless tools, and injection utilities |
+| `sudo bash scripts/xeno-reaper.sh setup-ai` | Configures opt-in Ollama local AI runtime and Bubblewrap agent sandbox |
+| `sudo bash scripts/xeno-reaper.sh chroot` | Interactive chroot into rootfs with safe mount/trap handling |
 | `sudo bash drivers/install-oot-wifi.sh` | Builds and installs Realtek rtl8812au out-of-tree injection DKMS module |
-| `sudo bash scripts/enter-rootfs.sh` | Interactive chroot into rootfs with safe mount/trap handling |
 
 ---
 
 ## Automated Test Suite Execution
 
-Simulation Mode (headless, no display server required):
+All 96 automated tests and simulator harnesses are embedded natively in [`scripts/xeno-reaper.sh`](file:///home/xeno/Xeno-os/scripts/xeno-reaper.sh).
+
+Run all 96 tests (73 E2E Integration + 23 Adversarial IPC boundary tests):
 ```bash
-python3 tests/run_tests.py
+bash scripts/xeno-reaper.sh test-all
 ```
 
-Adversarial IPC Boundary Suite:
+Run specific test modules:
 ```bash
-python3 -m unittest tests/test_adversarial.py
-```
-
-Live Mode (interacts with active Wayland/X11 session):
-```bash
-python3 tests/run_tests.py --live
+bash scripts/xeno-reaper.sh test-e2e   # 73 E2E Integration & UX scenario tests
+bash scripts/xeno-reaper.sh test-adv   # 23 Adversarial IPC boundary tests
+bash scripts/xeno-reaper.sh test-live  # Live Wayland/Hyprland session tests
 ```
 
 Total Test Count: **96 tests** (73 E2E Integration tests + 23 Adversarial boundary tests).
@@ -97,8 +97,7 @@ Xeno-os/
 ├── iso/              # ISO build directory (build/casper/, output/ALPHA, output/BETA, version.txt)
 ├── kernel/           # XanMod patches (0001, 0002, 0003), configs, cache/, build-kernel.sh, validate-kernel-deb.sh
 ├── rootfs/           # Ubuntu 24.04 LTS (Noble) debootstrap root filesystem
-├── scripts/          # Packaging, doctor, chroot, compat, AI, and boot-fix shell scripts
-├── tests/            # Automated test suites (96 tests across E2E & Adversarial, simulator.py)
+├── scripts/          # auto-build.sh (ISO packaging), lib-chroot.sh, and xeno-reaper.sh (Master Suite & Tests)
 ├── .cursorrules      # Core engineering guidelines & revision logs
 ├── .editorconfig     # Global formatting & indentation rules
 ├── AGENTS.md         # Developer & AI agent instructions

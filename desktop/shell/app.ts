@@ -138,6 +138,27 @@ if (typeof process !== "undefined") {
   process.on("unhandledRejection", (reason: any) => {
     console.error("[Shell Error Boundary] Unhandled Rejection:", reason);
   });
+
+  const cleanupSocket = () => {
+    const socketPath = process.env.XENO_IPC_SOCKET || "/tmp/xeno-ipc.sock";
+    try {
+      if (fs.existsSync(socketPath)) {
+        fs.unlinkSync(socketPath);
+      }
+    } catch (e) {
+      // Clean exit
+    }
+  };
+
+  process.on("SIGINT", () => {
+    cleanupSocket();
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    cleanupSocket();
+    process.exit(0);
+  });
+  process.on("exit", cleanupSocket);
 }
 
 // 2. Start UNIX domain socket IPC server
@@ -157,16 +178,20 @@ function startIPCServer() {
       socket: {
         open(socket: any) {
           // Strict IPC Socket Peer UID Verification
-          if (typeof socket.getPeerCredentials === "function") {
-            const creds = socket.getPeerCredentials();
-            if (creds && typeof creds.uid === "number" && typeof process.getuid === "function") {
-              const currentUid = process.getuid();
-              if (creds.uid !== currentUid && creds.uid !== 0) {
-                console.warn(`[IPC Security] Rejected connection from unauthorized peer UID: ${creds.uid}`);
-                socket.end();
-                return;
+          try {
+            if (typeof socket.getPeerCredentials === "function") {
+              const creds = socket.getPeerCredentials();
+              if (creds && typeof creds.uid === "number" && typeof process.getuid === "function") {
+                const currentUid = process.getuid();
+                if (creds.uid !== currentUid && creds.uid !== 0) {
+                  console.warn(`[IPC Security] Rejected connection from unauthorized peer UID: ${creds.uid}`);
+                  socket.end();
+                  return;
+                }
               }
             }
+          } catch (err) {
+            console.warn("[IPC Security] Peer verification warning:", err);
           }
         },
         data(socket: any, data: any) {
@@ -182,14 +207,31 @@ function startIPCServer() {
                 }
               }
             }
-            const reqStr = data.toString("utf-8");
-            const request = JSON.parse(reqStr);
+            const reqStr = (data ? data.toString("utf-8") : "").trim();
+            if (!reqStr) {
+              socket.write(JSON.stringify({ status: "error", message: "Empty IPC payload" }));
+              socket.end();
+              return;
+            }
+            let request: any;
+            try {
+              request = JSON.parse(reqStr);
+            } catch (jsonErr: any) {
+              socket.write(JSON.stringify({ status: "error", message: `Malformed JSON payload: ${jsonErr.message || String(jsonErr)}` }));
+              socket.end();
+              return;
+            }
             const response = handleIPCRequest(request);
             socket.write(JSON.stringify(response));
-          } catch (e) {
-            socket.write(JSON.stringify({ status: "error", message: String(e) }));
+          } catch (e: any) {
+            try {
+              socket.write(JSON.stringify({ status: "error", message: `IPC handling failure: ${e.message || String(e)}` }));
+            } catch (_) {}
+          } finally {
+            try {
+              socket.end();
+            } catch (_) {}
           }
-          socket.end();
         }
       },
       unix: socketPath
