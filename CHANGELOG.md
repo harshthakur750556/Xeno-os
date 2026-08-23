@@ -9,6 +9,71 @@
 This file contains the complete, detailed, timestamped development activity log for Xeno OS.
 All AI agents and developers MUST automatically append new session briefings to this file upon making changes.
 
+### August 23, 2026 - Session 22 Briefing: Edition & Release Matrix Selector, Beta v10 Final Milestone Cap, & Snapshot Freeze
+- **Primary Objective**:
+  * Implement an interactive and CLI-driven **Designer Edition & Release Target Matrix Selector** with Cyber-Nord ASCII banners, glowing border boxes, stability gauges, and non-hardcoded sub-headers.
+  * Enforce **`v10.0-beta` as the Final Milestone for the Beta Series**, ensuring version progression automatically caps at `10.0-beta` and seamlessly facilitates shifting to Omega (Sovereign Gold Master) or Alpha (Rolling Canary) channels.
+  * Enable instantaneous **Milestone Snapshot Freezing / Recreating** to rebuild active versions without incrementing version strings.
+  * Ensure seamless interoperability between `scripts/auto-build.sh` (`--select`, `--alpha`, `--beta`, `--omega`, `--recreate`, `--version=<ver>`) and `scripts/xeno-reaper.sh` (Option `[15]` sub-menu & `select-tier` CLI command).
+- **Changes Made**:
+  * **Designer Edition & Release Target Matrix (`scripts/auto-build.sh` & `scripts/xeno-reaper.sh`)**:
+    - Built `render_edition_selector` presenting a full Cyber-Nord graphical matrix with channel stability meters:
+      * `[1] BETA EDITION`: `[████████████████░░░░] 80% Stability` — *Standard Release Candidate Pipeline (Feature-Complete Channel)*
+      * `[2] ALPHA EDITION`: `[████████░░░░░░░░░░░░] 40% Stability` — *Experimental Rolling Canary Substrate (Cutting-Edge Development)*
+      * `[3] OMEGA EDITION`: `[████████████████████] 100% Stability` — *Sovereign Master Production Gold Image (Ultimate Release Channel)*
+      * `[4] RECREATE ISO`: `[SNAPSHOT FREEZE]` — *Re-package current milestone (${BUILD_VERSION}) without incrementing*
+      * `[5] CUSTOM VERSION`: `[MANUAL TAG]` — *Specify manual semantic version string (e.g. 10.0-beta, 1.0-omega)*
+  * **Beta Series Milestone Cap at v10.0-beta**:
+    - Embedded Python version resolution engine: increments `9.0-beta` -> `9.5-beta` -> `10.0-beta`.
+    - Once `10.0-beta` is reached, it is explicitly flagged and locked as `10.0-beta (Final Beta Milestone)`.
+    - Automatic `iso/version.txt` updates freeze at `10.0-beta`, preserving milestone integrity until the user explicitly promotes the edition.
+  * **CLI & Menu Integration**:
+    - Added `--select` / `--interactive` flag to `scripts/auto-build.sh`.
+    - Enhanced Menu Option `[15]` in `scripts/xeno-reaper.sh` to prompt for immediate build, opening the designer matrix selector, or freezing snapshot recreation.
+    - Added `bash scripts/xeno-reaper.sh select-tier` and argument passthrough to `build-iso`.
+- **Verification & Diagnostic Outcome**:
+  * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
+  * Verified `bash -n scripts/xeno-reaper.sh`: 0 syntax errors.
+  * Executed `bash scripts/xeno-reaper.sh health`: 0 issues found (clean exit code 0).
+
+---
+
+### August 23, 2026 - Session 21 Briefing: Live Real-Time Dynamic Rendered Progress Bars, Master Build Bar & Telemetry Graphs
+- **Primary Objective**:
+  * Implement dynamic live rendered progress bars, braille spinners, and real-time CPU/RAM/Disk telemetry graphs in `scripts/xeno-reaper.sh` and `scripts/auto-build.sh`.
+  * Implement a unified **Master Progress Bar**, per-stage timing limits, and a real-time dynamic ETA countdown engine in `scripts/auto-build.sh`.
+  * Create a custom `CyberNordTestRunner` inside the embedded Python test suite emitting animated live single-line test progress with real-time pass/fail counters and braille spinner.
+  * Implement dynamic multi-stage visual progress bars for the 9-stage ISO packaging pipeline in `scripts/auto-build.sh` and 8-tier Master Doctor in `scripts/xeno-reaper.sh`.
+  * Ensure non-interactive / redirected logging compatibility (`IS_TTY` guard) to prevent terminal buffer corruption when piped to files or CI runners.
+  * Update `README.md` and `CHANGELOG.md` with complete documentation.
+- **Changes Made**:
+  * **Master Build Progress Bar & ETA Engine (`scripts/auto-build.sh`)**:
+    - Configured total pipeline target time (~250s / ~4m 10s) and detailed per-stage timing profiles (`STAGE_EST_SECS` and cumulative weight offsets `STAGE_CUMULATIVE_SECS`).
+    - Implemented dynamic Master Progress Bar in `render_stage_progress` and `run_with_spinner`, rendering:
+      `⠋ [██████████████░░░░] 68% [6/9] Casper Live Initramfs... [00:32/~45s] ETA:~01:25`
+    - Displayed dynamic stage headers with elapsed build time, estimated remaining pipeline time, and stage target comparisons.
+  * **Dynamic Terminal Progress & Telemetry Engine (`scripts/xeno-reaper.sh` & `scripts/auto-build.sh`)**:
+    - Implemented `render_bar <val> <max> <width> <color>` drawing smooth Unicode block progress bars (`█` and `░`) with precise percentage calculation and Cyber-Nord color tokens.
+    - Implemented `render_telemetry_dashboard` querying `/proc/stat`, `/proc/meminfo`, and `df` in real time to render a dynamic boxed telemetry dashboard (CPU Load %, RAM Usage GB %, and Workspace Disk Free %) directly under the ASCII header banner.
+    - Implemented `run_with_spinner "Task description" <est_seconds> <cmd...>` executing background subprocesses with smooth 10-frame braille spinners (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`), dynamic elapsed timers `[MM:SS]`, and clean in-place completion checkmarks (`✔ [DONE]` / `✖ [FAIL]`).
+  * **Custom Animated Python Test Runner (`CyberNordTestResult` & `CyberNordTestRunner`)**:
+    - Created custom `unittest.TestResult` subclass overriding `startTest`, `addSuccess`, `addFailure`, `addError`, and `addSkip` to render single-line live updating progress bars:
+      `⠋ [████████████████░░░░] 78% (57/73) │ ✔ 57 │ ✖ 0 │ [00:18] test_ram_meter_parsing_valid`
+    - Implemented final boxed Test Suite Report displaying a graphical Pass Rate Gauge (`[████████████████████████] 100.0%`), executed test counts, total duration, and formatted failure traces.
+  * **Master Doctor 8-Tier Progress Tracker (`scripts/xeno-reaper.sh`)**:
+    - Added `render_doctor_tier` rendering dynamic visual progress bars across all 8 diagnostic tiers (`Tier [1/8] (12%)` to `Tier [8/8] (100%)`).
+    - Added overall Health Index bar gauge (`Health Index: [███████████████████████░] 97%`) in the final diagnostic summary report.
+  * **Documentation Updates**:
+    - Updated `README.md` to document the dynamic real-time progress engine, master build bar, and build progress stages.
+    - Appended Session 21 Briefing to `CHANGELOG.md`.
+- **Verification & Diagnostic Outcome**:
+  * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors, valid bash AST (executed without running the build).
+  * Executed `bash scripts/xeno-reaper.sh health`: Verified live telemetry snapshot and clean exit code 0.
+  * Executed `bash scripts/xeno-reaper.sh test-all`: Verified dynamic live test progress bar with braille spinner and 100% pass rate (73/73 tests passed in 29.4s).
+  * Executed `bash scripts/xeno-reaper.sh doctor`: Verified 8-Tier dynamic progress bar, 33/34 passed checks, Health Index: **97% [OPTIMAL]**.
+
+---
+
 ### August 23, 2026 - Session 20 Briefing: Native Test Suite Embedding & Banner Glyph Correction
 - **Primary Objective**:
   * Correct the ASCII art banner 'X' character in `scripts/xeno-reaper.sh` for visual symmetry.

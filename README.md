@@ -78,6 +78,7 @@ Xeno OS is distributed across three progressive lifecycle editions engineered to
 
 ### 2. BETA VERSION — Internal Architecture Proving Ground & Interactive Desktop (With GUI)
 * **Target Output**: `iso/output/BETA VERSION/`
+* **Milestone Horizon**: Capped at **`v10.0-beta` as the Final Milestone of the Beta Series**. Once v10.0-beta is reached, the release progression freezes snapshot versions or seamlessly transitions to the sovereign **Omega Series** (`1.0-omega` / `10.0-omega` Gold Master) or canary **Alpha Series** (`1.0-alpha`).
 * **Core Mission**: **The Architectural Refinement & Kernel Stabilization Engine**. Beta serves as the active testing and optimization ground where low-level kernel primitives, memory compression algorithms, scheduler preemption loops, and user-space IPC layers are stress-tested and perfected before freezing the immutable Alpha base and Omega gold master.
 * **Curated Strict Application Manifest (7 Categories)**:
   1. **System Core**: `systemd`, `casper`, `NetworkManager`, `PipeWire`, `WirePlumber`, `Bluez`, `TLP`, `Mesa Vulkan drivers`, `Hyprland`, `XWayland`, `kitty`.
@@ -479,11 +480,13 @@ Xeno OS features a native TypeScript desktop shell built on **Astal v2** (GTK3) 
 <details open>
 <summary><b>1. Xeno Reaper Command Center (`scripts/xeno-reaper.sh`)</b></summary>
 
+Features live real-time dynamic progress bars (`render_bar`), ASCII telemetry gauges (CPU %, RAM used/total, Disk free), animated braille spinners (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`), 8-Tier progress tracker, and the custom `CyberNordTestRunner` emitting real-time test pass/fail tickers:
+
 ```bash
 # Launch the interactive Cyber-Nord Command Center menu
 bash scripts/xeno-reaper.sh
 
-# Run 8-Tier Master Diagnostic audit
+# Run 8-Tier Master Diagnostic audit with dynamic progress bars and health gauge
 bash scripts/xeno-reaper.sh doctor
 
 # Run Master Diagnostic in self-healing auto-repair mode
@@ -516,11 +519,25 @@ sudo bash scripts/xeno-reaper.sh chroot
 </details>
 
 <details open>
-<summary><b>2. ISO Packaging Pipeline (Smart Lean Engine)</b></summary>
+<summary><b>2. ISO Packaging Pipeline (Smart Lean Engine with Edition Matrix & 9-Stage Progress Bar)</b></summary>
+
+Features the designer **Edition & Release Matrix Selector** (Alpha / Beta / Omega / Snapshot Freeze), real-time telemetry dashboard, Master Progress Bar (`Stage [1/9] (11%)` to `Stage [9/9] (100%)`), live background spinners with dynamic ETAs, and post-build summary report:
 
 ```bash
-# Run full automated ISO packaging pipeline (ZSTD L19 + Level 3 GRUB)
+# Launch interactive Designer Edition Matrix & Target Selector
+sudo bash scripts/auto-build.sh --select
+
+# Run automated packaging with currently queued milestone
 sudo bash scripts/auto-build.sh
+
+# Recreate / rebuild current milestone without incrementing (snapshot freeze)
+sudo bash scripts/auto-build.sh --recreate
+
+# Target specific release editions directly
+sudo bash scripts/auto-build.sh --beta     # Feature-complete candidate channel
+sudo bash scripts/auto-build.sh --alpha    # Rolling canary headless core
+sudo bash scripts/auto-build.sh --omega    # Sovereign gold master channel
+sudo bash scripts/auto-build.sh --version=10.0-beta
 ```
 </details>
 

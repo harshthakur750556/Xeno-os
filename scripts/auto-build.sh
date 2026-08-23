@@ -1,7 +1,13 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════
-# Xeno OS — Full ISO packaging pipeline
-# ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+#   ░█──░█ ░█▀▀▀ ░█▄─░█ ░█▀▀█ ── ░█▀▀█ ░█▀▀▀ ─█▀▀█ ░█▀▀█ ░█▀▀▀ ░█▀▀█ 
+#   ─░█░█─ ░█▀▀▀ ░█░█░█ ░█──█ ── ░█▄▄▀ ░█▀▀▀ ░█▄▄█ ░█▄▄█ ░█▀▀▀ ░█▄▄▀ 
+#   ░█──░█ ░█▄▄▄ ░█──▀█ ░█▄▄█ ── ░█─░█ ░█▄▄▄ ░█──█ ░█─── ░█▄▄▄ ░█─░█ 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  XENO OS — Smart Lean Automated ISO Packaging & Build Pipeline
+#  Dual BIOS/UEFI Level 3 GRUB Master Engine with ZSTD L19 SquashFS Compression
+# ═══════════════════════════════════════════════════════════════════════════════
+
 set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin:$HOME/.bun/bin:/home/xeno/.bun/bin:${PATH:-}"
@@ -11,7 +17,173 @@ mkdir -p "$WS_DIR/iso"
 if [ -f "$VERSION_FILE" ]; then
     BUILD_VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
 else
-    BUILD_VERSION="4.0"
+    BUILD_VERSION="9.0-beta"
+fi
+
+# ── Cyber-Nord Visual Tokens & Terminal Capabilities ─────────────────────────
+IS_TTY=0
+[ -t 1 ] && [ "${TERM:-}" != "dumb" ] && IS_TTY=1
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_DIM="\033[2m"
+C_CYAN="\033[38;2;136;192;208m"    # Nord Frost (#88C0D0)
+C_BLUE="\033[38;2;129;161;193m"    # Nord Polar Blue (#81A1C1)
+C_DEEP_BLUE="\033[38;2;94;129;172m" # Nord Deep Blue (#5E81AC)
+C_GREEN="\033[38;2;163;190;140m"   # Nord Aurora Green (#A3BE8C)
+C_YELLOW="\033[38;2;235;203;139m"  # Nord Aurora Yellow (#EBCB8B)
+C_RED="\033[38;2;191;97;106m"      # Nord Aurora Red (#BF616A)
+C_MAGENTA="\033[38;2;180;142;173m" # Nord Aurora Purple (#B48EAD)
+C_TEXT="\033[38;2;236;239;244m"     # Nord Snow Storm (#ECEFF4)
+
+# Render graphical progress/usage bar
+render_bar() {
+    local val="${1:-0}" max="${2:-100}" width="${3:-20}" color="${4:-$C_CYAN}"
+    [ "$max" -le 0 ] 2>/dev/null && max=100
+    [ "$val" -lt 0 ] 2>/dev/null && val=0
+    [ "$val" -gt "$max" ] 2>/dev/null && val="$max"
+    local pct=$(( val * 100 / max ))
+    local filled=$(( val * width / max ))
+    local empty=$(( width - filled ))
+    local bar=""
+    for ((b=0; b<filled; b++)); do bar+="█"; done
+    local empty_bar=""
+    for ((b=0; b<empty; b++)); do empty_bar+="░"; done
+    printf "${color}%s${C_DIM}%s${C_RESET} %3d%%" "$bar" "$empty_bar" "$pct"
+}
+
+# ── Designer Edition Matrix Selector (Alpha / Beta / Omega / Recreate) ───────
+render_edition_selector() {
+    clear
+    echo -e "${C_CYAN}${C_BOLD}"
+    cat << 'SELECTOR_BANNER_EOF'
+ ░█▀▀▀ ░█▀▀▄ ░█ ▀▀█▀▀ ░█ ░█▀▀█ ░█▄─░█   ░█▀▄▀█ ─█▀▀█ ▀▀█▀▀ ░█▀▀█ ░█ ░█ ░█ ░█ 
+ ░█▀▀▀ ░█─░█ ░█ ─░█── ░█ ░█──█ ░█░█░█   ░█░█░█ ░█▄▄█ ─░█── ░█▄▄▀ ░█ ─░█░█─ 
+ ░█▄▄▄ ░█▄▄▀ ░█ ─░█── ░█ ░█▄▄█ ░█──▀█   ░█──░█ ░█──█ ─░█── ░█─░█ ░█ ──░█── 
+SELECTOR_BANNER_EOF
+    echo -e "${C_BLUE} ═══ XENO OS EDITION & RELEASE TARGET MATRIX ═══${C_RESET}\n"
+
+    local current_tier_badge="$C_GREEN[ BETA ]$C_RESET"
+    local current_stability="$(render_bar 80 100 16 "$C_GREEN")"
+    if [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
+        current_tier_badge="$C_MAGENTA[ OMEGA ]$C_RESET"
+        current_stability="$(render_bar 100 100 16 "$C_MAGENTA")"
+    elif [[ "$BUILD_VERSION" =~ alpha|ALPHA ]]; then
+        current_tier_badge="$C_BLUE[ ALPHA ]$C_RESET"
+        current_stability="$(render_bar 40 100 16 "$C_BLUE")"
+    fi
+
+    echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}CURRENT ACTIVE TARGET MILESTONE${C_RESET}                                             ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Active Version:${C_RESET}    %-45b ${C_DIM}│${C_RESET}\n" "${C_BOLD}${BUILD_VERSION}${C_RESET} ${current_tier_badge}"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Channel Stability:${C_RESET} %-45b ${C_DIM}│${C_RESET}\n" "${current_stability}"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Release Target:${C_RESET}    ${C_DIM}%-45s${C_RESET} ${C_DIM}│${C_RESET}\n" "iso/output/${TIER_NAME}/${ISO_NAME}"
+    echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}Select Release Channel or Milestone Action:${C_RESET}                                  ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_BOLD}BETA EDITION${C_RESET}    %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 80 100 14 "$C_GREEN")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Standard Release Candidate Pipeline (Feature-Complete Channel)${C_RESET}          ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_BLUE}[2]${C_RESET} ${C_BOLD}ALPHA EDITION${C_RESET}   %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 40 100 14 "$C_BLUE")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Experimental Rolling Canary Substrate (Cutting-Edge Development)${C_RESET}       ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_MAGENTA}[3]${C_RESET} ${C_BOLD}OMEGA EDITION${C_RESET}   %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 100 100 14 "$C_MAGENTA")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Sovereign Master Production Gold Image (Ultimate Release Channel)${C_RESET}      ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_YELLOW}[4]${C_RESET} ${C_BOLD}RECREATE ISO${C_RESET}    %-28b ${C_DIM}│${C_RESET}\n" "${C_YELLOW}[SNAPSHOT FREEZE]${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Re-package current milestone (${BUILD_VERSION}) without incrementing${C_RESET}        ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_CYAN}[5]${C_RESET} ${C_BOLD}CUSTOM VERSION${C_RESET}  %-28b ${C_DIM}│${C_RESET}\n" "${C_CYAN}[MANUAL TAG]${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Specify manual semantic versioning string (e.g. 10.0-beta, 1.0-omega)${C_RESET}   ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_TEXT}[6] PROCEED WITH CURRENT ACTIVE (${BUILD_VERSION})${C_RESET}                                  ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_DIM}[0] CANCEL AND EXIT${C_RESET}                                                        ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+
+    read -rp "Enter selection [0-6] (default: 6): " ed_choice
+    ed_choice="${ed_choice:-6}"
+    
+    case "$ed_choice" in
+        1)
+            local num
+            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(m.group(1) if m else '9.0')")
+            local val
+            val=$(python3 -c "n = float('$num'); print('10.0' if n >= 10.0 else f'{n}')")
+            BUILD_VERSION="${val}-beta"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            echo -e "  ${C_GREEN}✔ Shifted to Beta Edition: ${BUILD_VERSION}${C_RESET}\n"
+            ;;
+        2)
+            local num
+            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(m.group(1) if m else '1.0')")
+            BUILD_VERSION="${num}-alpha"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            echo -e "  ${C_BLUE}✔ Shifted to Alpha Edition: ${BUILD_VERSION}${C_RESET}\n"
+            ;;
+        3)
+            local num
+            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print('1.0' if float(m.group(1) if m else '1.0') < 1.0 else m.group(1))")
+            BUILD_VERSION="${num}-omega"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            echo -e "  ${C_MAGENTA}✔ Shifted to Omega Edition: ${BUILD_VERSION}${C_RESET}\n"
+            ;;
+        4)
+            export XENO_RECREATE_ISO=1
+            echo -e "  ${C_YELLOW}✔ Recreating active milestone snapshot: ${BUILD_VERSION} (version freeze enabled)${C_RESET}\n"
+            ;;
+        5)
+            read -rp "Enter target version string (e.g. 10.0-beta, 1.0-omega, 9.5-beta): " custom_ver
+            if [ -n "$custom_ver" ]; then
+                BUILD_VERSION=$(echo "$custom_ver" | tr -d '[:space:]')
+                echo "$BUILD_VERSION" > "$VERSION_FILE"
+                echo -e "  ${C_CYAN}✔ Target version set to: ${BUILD_VERSION}${C_RESET}\n"
+            fi
+            ;;
+        6)
+            echo -e "  ${C_GREEN}✔ Proceeding with currently active milestone: ${BUILD_VERSION}${C_RESET}\n"
+            ;;
+        0|q|cancel)
+            echo -e "  ${C_YELLOW}Packaging cancelled by user.${C_RESET}"
+            exit 0
+            ;;
+        *)
+            echo -e "  ${C_YELLOW}Invalid choice, continuing with active milestone: ${BUILD_VERSION}${C_RESET}\n"
+            ;;
+    esac
+}
+
+# ── Argument Handling & Tier Configuration ──────────────────────────────────
+INTERACTIVE_SELECT=0
+for arg in "${@:-}"; do
+    case "$arg" in
+        --select|--interactive|-i)
+            INTERACTIVE_SELECT=1
+            ;;
+        --beta|--tier-beta)
+            BUILD_VERSION="9.0-beta"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            ;;
+        --alpha|--tier-alpha)
+            BUILD_VERSION="1.0-alpha"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            ;;
+        --omega|--tier-omega)
+            BUILD_VERSION="1.0-omega"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            ;;
+        --recreate|--rebuild|--recreate-beta)
+            export XENO_RECREATE_ISO=1
+            ;;
+        --version=*|--ver=*)
+            BUILD_VERSION="${arg#*=}"
+            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            ;;
+    esac
+done
+
+if [ "$INTERACTIVE_SELECT" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
+    render_edition_selector
 fi
 
 if [[ "$BUILD_VERSION" =~ beta|BETA ]]; then
@@ -40,13 +212,188 @@ ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
 META_FILE="$CACHE_DIR/latest_release.json"
 VOLUME_ID="XENOOS"
+
+# ── Pipeline Time Profiling & Master Progress Configuration ────────────────
+TOTAL_ESTIMATED_SECS=250
+CURRENT_STAGE=1
+
+STAGE_EST_SECS=(0 6 10 6 15 25 45 90 15 38)
+STAGE_CUMULATIVE_SECS=(0 0 6 16 22 37 62 107 197 212 250)
+STAGE_TITLES=(
+    ""
+    "Boot Display & Hyprland VM Graphics Fallback"
+    "GitHub Authentication & Kernel Rollout Audit"
+    "Custom Kernel Package WLAN/Injection Validation Gate"
+    "Custom XanMod Kernel RootFS Deployment"
+    "Desktop Environment & Universal Application Stacks"
+    "Casper Live Boot Stack & ZRAM Generator Setup"
+    "RootFS Optimization & Smart ZSTD Level 19 SquashFS"
+    "Hybrid Dual Bootloader Assembly (BIOS + UEFI)"
+    "Master ISO Image Generation & Host Delivery"
+)
+
+# Live Telemetry Snapshot Box
+render_telemetry_dashboard() {
+    local cpu_usage=0
+    if [ -f /proc/stat ]; then
+        local cpu_idle
+        cpu_idle=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $8}' | cut -d'.' -f1 || echo 85)
+        cpu_usage=$(( 100 - ${cpu_idle:-85} ))
+        [ "$cpu_usage" -lt 0 ] && cpu_usage=0
+        [ "$cpu_usage" -gt 100 ] && cpu_usage=100
+    fi
+
+    local ram_total="16.0" ram_used="4.0" ram_pct=25
+    if [ -f /proc/meminfo ]; then
+        local t u a
+        t=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 16777216)
+        a=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 12582912)
+        u=$(( t - a ))
+        ram_total=$(awk "BEGIN {printf \"%.1f\", $t / 1048576}")
+        ram_used=$(awk "BEGIN {printf \"%.1f\", $u / 1048576}")
+        ram_pct=$(( u * 100 / (t > 0 ? t : 1) ))
+    fi
+
+    local disk_free="50G" disk_pct=30
+    if command -v df >/dev/null 2>&1; then
+        disk_pct=$(df -h "$WS_DIR" 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%' || echo 30)
+        disk_free=$(df -h "$WS_DIR" 2>/dev/null | awk 'NR==2 {print $4}' || echo "50G")
+    fi
+    local disk_used_pct=${disk_pct:-30}
+
+    echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}SYSTEM TELEMETRY & LIVE RESOURCE GAUGES${C_RESET}                                     ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}CPU Load:${C_RESET}  %-36b ${C_DIM}│${C_RESET} Load:  %3d%%        ${C_DIM}│${C_RESET}\n" "$(render_bar "$cpu_usage" 100 18 "$C_CYAN")" "$cpu_usage"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}RAM Usage:${C_RESET} %-36b ${C_DIM}│${C_RESET} %5s / %-5s GB ${C_DIM}│${C_RESET}\n" "$(render_bar "$ram_pct" 100 18 "$C_GREEN")" "$ram_used" "$ram_total"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Disk Used:${C_RESET} %-36b ${C_DIM}│${C_RESET} %5s free      ${C_DIM}│${C_RESET}\n" "$(render_bar "$disk_used_pct" 100 18 "$C_BLUE")" "$disk_free"
+    echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+}
+
+# Dynamic Master Progress Bar & Stage Header
+render_stage_progress() {
+    local stage="$1"
+    CURRENT_STAGE="$stage"
+    local now
+    now=$(date +%s)
+    local total_elapsed=$(( now - BUILD_START_TIME ))
+    local total_mins=$(( total_elapsed / 60 ))
+    local total_secs=$(( total_elapsed % 60 ))
+    
+    local est_secs_up_to_stage=${STAGE_CUMULATIVE_SECS[$stage]}
+    local pct=$(( est_secs_up_to_stage * 100 / TOTAL_ESTIMATED_SECS ))
+    [ "$pct" -gt 100 ] && pct=100
+    [ "$pct" -lt 0 ] && pct=0
+    
+    local remaining_est=$(( TOTAL_ESTIMATED_SECS - total_elapsed ))
+    [ "$remaining_est" -lt 0 ] && remaining_est=0
+    local rem_mins=$(( remaining_est / 60 ))
+    local rem_secs=$(( remaining_est % 60 ))
+    
+    local bar
+    bar=$(render_bar "$pct" 100 28 "$C_CYAN")
+    
+    echo -e "\n${C_BOLD}${C_CYAN}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}  STAGE [${stage}/9]: ${STAGE_TITLES[$stage]}${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+    if [ "$IS_TTY" -eq 1 ]; then
+        printf "  ${C_BOLD}Master Progress:${C_RESET} %b  ${C_DIM}│ Elapsed: [%02d:%02d] │ Est. Remaining: [%02d:%02d]${C_RESET}\n" "$bar" "$total_mins" "$total_secs" "$rem_mins" "$rem_secs"
+        echo -e "  ${C_DIM}Stage Target Time: ~${STAGE_EST_SECS[$stage]}s | Total Pipeline Target: ~${TOTAL_ESTIMATED_SECS}s (~$(( TOTAL_ESTIMATED_SECS / 60 ))m $(( TOTAL_ESTIMATED_SECS % 60 ))s)${C_RESET}\n"
+    fi
+}
+
+# Live Spinner for Background Tasks with Real-Time Master Progress & Dynamic ETA
+run_with_spinner() {
+    local label="$1"
+    local stage_est="${2:-15}"
+    shift 2
+
+    if [ "$IS_TTY" -eq 0 ]; then
+        echo -e "  -> [Stage ${CURRENT_STAGE}/9] ${label} (target: ~${stage_est}s)..."
+        "$@"
+        local rc=$?
+        [ $rc -eq 0 ] && echo -e "  ${C_GREEN}✔ [DONE]${C_RESET} ${label}" || echo -e "  ${C_RED}✖ [FAIL]${C_RESET} ${label} (exit $rc)"
+        return $rc
+    fi
+
+    local spin_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local log_file
+    log_file=$(mktemp /tmp/xeno_build_spin_XXXXXX.log 2>/dev/null || echo "/tmp/xeno_build_spin_$$.log")
+    
+    "$@" > "$log_file" 2>&1 &
+    local pid=$!
+    local start_time
+    start_time=$(date +%s)
+    local i=0
+
+    local stage_base_secs=${STAGE_CUMULATIVE_SECS[$CURRENT_STAGE]}
+
+    while kill -0 "$pid" 2>/dev/null; do
+        local now
+        now=$(date +%s)
+        local step_elapsed=$(( now - start_time ))
+        local step_mins=$(( step_elapsed / 60 ))
+        local step_secs=$(( step_elapsed % 60 ))
+        
+        local total_elapsed=$(( now - BUILD_START_TIME ))
+        local total_mins=$(( total_elapsed / 60 ))
+        local total_secs=$(( total_elapsed % 60 ))
+        
+        # Calculate dynamic master progress percentage with interpolation
+        local simulated_secs=$(( stage_base_secs + (step_elapsed > stage_est ? stage_est : step_elapsed) ))
+        local master_pct=$(( simulated_secs * 100 / TOTAL_ESTIMATED_SECS ))
+        [ "$master_pct" -gt 99 ] && master_pct=99
+        [ "$master_pct" -lt 0 ] && master_pct=0
+        
+        local eta_remaining=$(( TOTAL_ESTIMATED_SECS - total_elapsed ))
+        [ "$eta_remaining" -lt 0 ] && eta_remaining=0
+        local eta_mins=$(( eta_remaining / 60 ))
+        local eta_secs=$(( eta_remaining % 60 ))
+
+        local m_bar
+        m_bar=$(render_bar "$master_pct" 100 14 "$C_CYAN")
+        
+        local max_label_len=28
+        local short_label="$label"
+        if [ ${#short_label} -gt $max_label_len ]; then
+            short_label="${short_label:0:$((max_label_len - 3))}..."
+        fi
+
+        printf "\r  ${C_CYAN}%s${C_RESET} [%b] ${C_BOLD}[%d/9]${C_RESET} %-28s ${C_DIM}[%02d:%02d/~%02ds]${C_RESET} ${C_BLUE}ETA:~%02d:%02d${C_RESET}\033[K" \
+            "${spin_chars[i]}" "$m_bar" "$CURRENT_STAGE" "$short_label" "$step_mins" "$step_secs" "$stage_est" "$eta_mins" "$eta_secs"
+        i=$(( (i + 1) % ${#spin_chars[@]} ))
+        sleep 0.1
+    done
+
+    wait "$pid"
+    local rc=$?
+    local now
+    now=$(date +%s)
+    local step_elapsed=$(( now - start_time ))
+    local step_mins=$(( step_elapsed / 60 ))
+    local step_secs=$(( step_elapsed % 60 ))
+
+    if [ $rc -eq 0 ]; then
+        printf "\r  ${C_GREEN}✔ [DONE]${C_RESET} ${C_BOLD}[%d/9]${C_RESET} %-36s ${C_GREEN}[%02d:%02d] (target: ~%02ds)${C_RESET}\033[K\n" \
+            "$CURRENT_STAGE" "${label}" "$step_mins" "$step_secs" "$stage_est"
+        rm -f "$log_file"
+        return 0
+    else
+        printf "\r  ${C_RED}✖ [FAIL]${C_RESET} ${C_BOLD}[%d/9]${C_RESET} %-36s ${C_RED}[%02d:%02d] (code %d)${C_RESET}\033[K\n" \
+            "$CURRENT_STAGE" "${label}" "$step_mins" "$step_secs" "$rc"
+        tail -n 15 "$log_file" 2>/dev/null || true
+        rm -f "$log_file"
+        return $rc
+    fi
+}
+
 # shellcheck source=/dev/null
 source "$WS_DIR/scripts/lib-chroot.sh"
 
 cd "$WS_DIR"
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "ERROR: run as root: sudo bash scripts/auto-build.sh"
+    echo -e "${C_RED}ERROR: auto-build.sh must be run with root privileges (sudo).${C_RESET}"
     exit 1
 fi
 
@@ -54,38 +401,46 @@ exec 9>/tmp/xeno-auto-build.lock
 if command -v python3 >/dev/null 2>&1; then
     python3 -c 'import fcntl; fcntl.fcntl(9, fcntl.F_SETFD, fcntl.FD_CLOEXEC)' 2>/dev/null || true
 fi
-flock -n --cloexec 9 2>/dev/null || flock -n 9 || { echo "ERROR: auto-build.sh is already running."; exit 1; }
+flock -n --cloexec 9 2>/dev/null || flock -n 9 || { echo -e "${C_RED}ERROR: auto-build.sh is already actively running.${C_RESET}"; exit 1; }
 
-echo "=== Xeno OS Automated Packaging Pipeline ==="
-echo "Workspace: $WS_DIR"
+BUILD_START_TIME=$(date +%s)
 
-# ── 0. Boot display / session fixes ──────────────────────────
-echo "Applying boot display fixes..."
-bash "$WS_DIR/scripts/xeno-reaper.sh" fix-boot
+echo -e "${C_CYAN}${C_BOLD}"
+cat << 'BANNER_EOF'
+ ░█──░█ ░█▀▀▀ ░█▄─░█ ░█▀▀█ ── ░█▀▀█ ░█▀▀▀ ─█▀▀█ ░█▀▀█ ░█▀▀▀ ░█▀▀█ 
+ ─░█░█─ ░█▀▀▀ ░█░█░█ ░█──█ ── ░█▄▄▀ ░█▀▀▀ ░█▄▄█ ░█▄▄█ ░█▀▀▀ ░█▄▄▀ 
+ ░█──░█ ░█▄▄▄ ░█──▀█ ░█▄▄█ ── ░█─░█ ░█▄▄▄ ░█──█ ░█─── ░█▄▄▄ ░█─░█ 
+BANNER_EOF
+echo -e "${C_BLUE} ═══ XENO OS SMART LEAN AUTOMATED PACKAGING PIPELINE ═══${C_RESET}"
+echo -e "${C_DIM} Target: ${TARGET_ISO} | Edition: ${TIER_NAME}${C_RESET}"
+echo -e "${C_DIM} Expected Pipeline Time: ~${TOTAL_ESTIMATED_SECS}s (~$(( TOTAL_ESTIMATED_SECS / 60 ))m $(( TOTAL_ESTIMATED_SECS % 60 ))s) Across 9 Major Stages${C_RESET}\n"
 
-# ── 1. GitHub auth (for kernel release download) ─────────────
+render_telemetry_dashboard
+
+# ── STAGE 1: Boot display / session fixes ────────────────────
+render_stage_progress 1
+run_with_spinner "Applying boot display & PAM security limits" 6 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-boot
+
+# ── STAGE 2: GitHub auth & Kernel release fetch ──────────────
+render_stage_progress 2
 ACTUAL_USER="${SUDO_USER:-xeno}"
 if ! sudo -u "$ACTUAL_USER" gh auth status &>/dev/null && ! gh auth status &>/dev/null; then
-    echo "ERROR: GitHub CLI is not authenticated. Run 'gh auth login' first."
+    echo -e "${C_RED}ERROR: GitHub CLI is not authenticated. Run 'gh auth login' first.${C_RESET}"
     exit 1
 fi
 
-DETECTED_REPO=$(git config --get remote.origin.url | sed -E 's#.*github.com[:/](.+)(\.git)?$#\1#' | sed 's/\.git$//')
+DETECTED_REPO=$(git config --get remote.origin.url 2>/dev/null | sed -E 's#.*github.com[:/](.+)(\.git)?$#\1#' | sed 's/\.git$//' || echo "")
 REPO="${DETECTED_REPO:-YOURGITHUBUSERNAME/xeno-os}"
-echo "Targeting Repository: $REPO"
+echo -e "  ${C_CYAN}Targeting Repository:${C_RESET} ${REPO}"
 
-# ── 2. Kernel cache / release fetch ──────────────────────────
 mkdir -p "$CACHE_DIR" "$WS_DIR/iso/output"
 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$CACHE_DIR" 2>/dev/null || true
 
-echo "Checking custom kernel backup cache & rollout status..."
 NEED_DOWNLOAD=false
 REMOTE_TAG=""
 
-# First check if fresh local build exists in kernel/output
 if ls "$WS_DIR/kernel/output"/linux-image-*.deb &>/dev/null; then
-    echo "Found local kernel build in kernel/output. Staging..."
-    bash "$WS_DIR/scripts/xeno-reaper.sh" stage-kernel || true
+    run_with_spinner "Staging fresh local kernel from kernel/output" 4 bash "$WS_DIR/scripts/xeno-reaper.sh" stage-kernel || true
 fi
 
 RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
@@ -96,133 +451,115 @@ fi
 if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && [ -f "$META_FILE" ]; then
     LOCAL_TAG=$(jq -r '.tagName // empty' "$META_FILE" 2>/dev/null || true)
     if [ -n "$REMOTE_TAG" ] && [ "$REMOTE_TAG" != "$LOCAL_TAG" ] && [[ "$LOCAL_TAG" != local-build-* ]]; then
-        echo "[ROLLOUT DETECTED] Remote ($REMOTE_TAG) != local ($LOCAL_TAG). Updating..."
+        echo -e "  ${C_YELLOW}⚠ [ROLLOUT DETECTED]${C_RESET} Remote ($REMOTE_TAG) != local ($LOCAL_TAG). Updating..."
         NEED_DOWNLOAD=true
     else
-        echo "[KERNEL CACHE] Local backup tag=$LOCAL_TAG remote=$REMOTE_TAG"
+        echo -e "  ${C_GREEN}✔ [KERNEL CACHE]${C_RESET} Local backup tag=$LOCAL_TAG remote=$REMOTE_TAG"
     fi
 else
-    echo "[INITIAL DOWNLOAD] Fetching latest kernel release..."
+    echo -e "  ${C_BLUE}ℹ [INITIAL DOWNLOAD]${C_RESET} Fetching latest kernel release..."
     NEED_DOWNLOAD=true
 fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
-    echo "Downloading kernel packages from GitHub Release..."
     rm -f "$CACHE_DIR"/*.deb
-    if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber 2>/dev/null; then
-        if [ -n "$RELEASE_INFO" ]; then
-            echo "$RELEASE_INFO" > "$META_FILE"
+    download_kernel_pkgs() {
+        if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber 2>/dev/null; then
+            [ -n "$RELEASE_INFO" ] && echo "$RELEASE_INFO" > "$META_FILE"
+            return 0
         fi
-    else
-        echo "WARNING: Failed to download release debs from GitHub. Using local cache if present."
-    fi
+        return 1
+    }
+    run_with_spinner "Downloading kernel packages from GitHub Release" 8 download_kernel_pkgs || {
+        echo -e "  ${C_YELLOW}⚠ [WARN] Failed downloading release debs. Using local cache if present.${C_RESET}"
+    }
 fi
 
 if ! ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null; then
-    echo "ERROR: no linux-image-*.deb in $CACHE_DIR"
+    echo -e "${C_RED}ERROR: No linux-image-*.deb found in cache ($CACHE_DIR).${C_RESET}"
     exit 1
 fi
 
-# ── 3. Validate kernel debs (show-stopper gate) ──────────────
+# ── STAGE 3: Validate kernel debs (Show-stopper gate) ─────────
+render_stage_progress 3
 KERNEL_VALID=0
 if bash "$WS_DIR/kernel/validate-kernel-deb.sh" "$CACHE_DIR"; then
     KERNEL_VALID=1
-    echo "✓ Kernel debs passed WLAN/module validation"
+    echo -e "  ${C_GREEN}✔ [PASS] Kernel packages passed WLAN, NTSYNC, and packet injection validation.${C_RESET}"
 else
-    echo ""
-    echo "════════════════════════════════════════════════════"
-    echo "  FATAL: kernel debs failed validation."
-    echo "  Refusing to ship a Wi-Fi-broken custom kernel."
-    echo ""
-    echo "  Fix: rebuild kernel via CI (patches + WLAN fragment):"
-    echo "    gh workflow run build-kernel.yml"
-    echo "  Or wait for schedule / push under kernel/**"
-    echo "════════════════════════════════════════════════════"
-    # Fall back ONLY if Ubuntu generic is present so ISO still boots
+    echo -e "\n${C_RED}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_RED}  FATAL: Kernel packages failed validation. Refusing Wi-Fi-broken custom kernel.${C_RESET}"
+    echo -e "${C_RED}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
     if ! ls "$ROOTFS"/boot/vmlinuz-*-generic &>/dev/null; then
-        echo "ERROR: no generic fallback kernel either. Aborting."
+        echo -e "${C_RED}ERROR: No generic fallback kernel found in rootfs. Aborting build.${C_RESET}"
         exit 1
     fi
-    echo "Continuing with Ubuntu generic kernel fallback for this ISO build."
+    echo -e "  ${C_YELLOW}⚠ Continuing with Ubuntu generic kernel fallback for this build.${C_RESET}"
     KERNEL_VALID=0
 fi
 
-# ── 4. Repair / install kernel into rootfs ───────────────────
+# ── STAGE 4: Repair / install kernel into RootFS ─────────────
+render_stage_progress 4
 if [ "$KERNEL_VALID" = "1" ]; then
-    # Use validated debs
-    bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel
+    run_with_spinner "Installing validated XanMod kernel into RootFS" 15 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel
 else
-    # Purge broken custom kernels; keep generic
-    XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel || true
+    run_with_spinner "Configuring fallback generic kernel in RootFS" 15 env XENO_SKIP_CUSTOM=1 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-kernel || true
 fi
 
-# ── 5. Sync desktop & install feature stacks ─────────────────
-echo "Syncing desktop environment and tests into rootfs..."
-rsync -a --delete \
-    --exclude='*.local' \
-    --exclude='.config/' \
-    --exclude='custom/' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='*.pyo' \
-    --exclude='.pytest_cache' \
-    --exclude='node_modules' \
-    --exclude='.git' \
-    "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
+# ── STAGE 5: Sync desktop & install feature stacks ───────────
+render_stage_progress 5
+sync_desktop_env() {
+    rsync -a --delete \
+        --exclude='*.local' \
+        --exclude='.config/' \
+        --exclude='custom/' \
+        --exclude='__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.pyo' \
+        --exclude='.pytest_cache' \
+        --exclude='node_modules' \
+        --exclude='.git' \
+        "$WS_DIR/desktop/" "$ROOTFS/home/xeno/desktop/"
 
-rsync -a --delete \
-    --exclude='*.local' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='*.pyo' \
-    --exclude='.git' \
-    "$WS_DIR/scripts/" "$ROOTFS/home/xeno/scripts/"
-chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/scripts" 2>/dev/null || true
+    rsync -a --delete \
+        --exclude='*.local' \
+        --exclude='__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.pyo' \
+        --exclude='.git' \
+        "$WS_DIR/scripts/" "$ROOTFS/home/xeno/scripts/"
+    chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" "$ROOTFS/home/xeno/scripts" 2>/dev/null || true
 
-# Clean up developer history files so they do not leak into ISO
-rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
-rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
+    rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
+    rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
+}
+run_with_spinner "Syncing desktop shell & management scripts to RootFS" 5 sync_desktop_env
 
-# Ensure Windows + security tools present (idempotent)
 if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
-    run_feature_step() {
-        local step_name="$1"
-        shift
-        echo "Installing ${step_name} into rootfs..."
-        if ! "$@"; then
-            if [ "${XENO_STRICT_BUILD:-1}" = "1" ]; then
-                echo "FATAL: ${step_name} failed under XENO_STRICT_BUILD=1"
-                exit 1
-            else
-                echo "WARNING: ${step_name} setup had errors (non-fatal mode)"
-            fi
-        fi
-    }
-
     if [ ! -x "$ROOTFS/usr/bin/xeno-windows" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "Windows compatibility stack" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-compat
+        run_with_spinner "Setting up Windows compatibility stack (Wine/DXVK/Bottles)" 6 bash "$WS_DIR/scripts/xeno-reaper.sh" setup-compat
     fi
     if [ ! -x "$ROOTFS/usr/bin/xeno-wifi-monitor" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "Security/wireless tools" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-security
+        run_with_spinner "Setting up Security & wireless injection stack" 6 bash "$WS_DIR/scripts/xeno-reaper.sh" setup-security
     fi
     if [ ! -x "$ROOTFS/usr/bin/xeno-ai-engine" ] || [ "${XENO_FORCE_FEATURE_SETUP:-0}" = "1" ]; then
-        run_feature_step "AI Engine" bash "$WS_DIR/scripts/xeno-reaper.sh" setup-ai
+        run_with_spinner "Setting up Local AI Engine & Bubblewrap sandbox" 4 bash "$WS_DIR/scripts/xeno-reaper.sh" setup-ai
     fi
     if [ -x "$WS_DIR/drivers/install-oot-wifi.sh" ]; then
-        run_feature_step "OOT WiFi drivers" env XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh"
+        run_with_spinner "Building & installing Realtek RTL8812AU OOT injection driver" 4 env XENO_ROOTFS="$ROOTFS" bash "$WS_DIR/drivers/install-oot-wifi.sh"
     fi
 fi
 
-# Re-assert no broken packages after feature setup
 xeno_assert_no_broken_pkgs "$ROOTFS"
 
-# ── 6. Casper / initramfs essentials ─────────────────────────
-echo "Mounting rootfs and ensuring casper live stack..."
+# ── STAGE 6: Casper / Initramfs Live Boot Essentials ──────────
+render_stage_progress 6
 xeno_chroot_mount "$ROOTFS"
 cleanup_mounts() { xeno_chroot_umount "$ROOTFS"; }
 trap cleanup_mounts EXIT
 
-chroot "$ROOTFS" /bin/bash << 'EOF'
+build_casper_initramfs() {
+    chroot "$ROOTFS" /bin/bash << 'EOF'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get purge -y live-boot live-boot-initramfs-tools live-tools 2>/dev/null || true
@@ -246,7 +583,6 @@ for m in overlay squashfs zstd nls_utf8 isofs sr_mod sd_mod ahci; do
     grep -qxF "$m" /etc/initramfs-tools/modules 2>/dev/null || echo "$m" >> /etc/initramfs-tools/modules
 done
 
-# Select boot kernel: prefer validated xeno, else generic
 if ls /boot/vmlinuz-*xeno* >/dev/null 2>&1; then
     KIMG=$(ls /boot/vmlinuz-*xeno* 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
 else
@@ -260,18 +596,13 @@ if [ -z "$KIMG" ]; then
     exit 1
 fi
 NEW_VERSION="${KIMG#/boot/vmlinuz-}"
-echo "Boot kernel version: $NEW_VERSION"
-echo "Regenerating initramfs with casper live boot modules for $NEW_VERSION..."
 update-initramfs -u -k "$NEW_VERSION" || update-initramfs -c -k "$NEW_VERSION"
 
-# Reject broken package state
 bad=$(dpkg -l | awk '$1 ~ /U|H|R|F/ {print $2}')
 if [ -n "$bad" ]; then
-    echo "ERROR: broken packages remain:"
-    echo "$bad"
+    echo "ERROR: broken packages remain: $bad"
     exit 1
 fi
-# Reject dpkg-new modules
 if find /lib/modules -name '*.dpkg-new' 2>/dev/null | grep -q .; then
     echo "ERROR: *.dpkg-new modules present — kernel install incomplete"
     exit 1
@@ -279,28 +610,28 @@ fi
 apt-get clean
 echo "$NEW_VERSION" > /tmp/xeno-boot-kver
 EOF
+}
+
+run_with_spinner "Configuring Casper live initramfs, ZRAM & pruning bloat" 45 build_casper_initramfs
 
 trap - EXIT
 xeno_chroot_umount "$ROOTFS"
 
 KVER=$(cat "$ROOTFS/tmp/xeno-boot-kver")
-echo "Using kernel: $KVER"
+echo -e "  ${C_GREEN}✔ [BOOT KERNEL]${C_RESET} Using kernel: ${C_BOLD}$KVER${C_RESET}"
 
-# ── 7. Assemble casper boot files ────────────────────────────
-echo "Assembling bootloader files..."
+# Assemble bootloader files
 rm -rf "$WS_DIR/iso/build"/*
 mkdir -p "$WS_DIR/iso/build/casper" "$WS_DIR/iso/build/boot/grub/i386-pc"
 
 KERNEL_SRC="$ROOTFS/boot/vmlinuz-$KVER"
 INITRD_SRC="$ROOTFS/boot/initrd.img-$KVER"
 if [ ! -f "$KERNEL_SRC" ] || [ ! -f "$INITRD_SRC" ]; then
-    echo "ERROR: missing $KERNEL_SRC or $INITRD_SRC"
+    echo -e "${C_RED}ERROR: Missing $KERNEL_SRC or $INITRD_SRC.${C_RESET}"
     exit 1
 fi
 cp "$KERNEL_SRC" "$WS_DIR/iso/build/casper/vmlinuz"
 cp "$INITRD_SRC" "$WS_DIR/iso/build/casper/initrd"
-
-# Generate filesystem.manifest for Casper live boot validation
 chroot "$ROOTFS" dpkg-query -W --showformat='${Package} ${Version}\n' > "$WS_DIR/iso/build/casper/filesystem.manifest"
 
 cat > "$WS_DIR/iso/build/boot/grub/grub.cfg" << 'EOF'
@@ -316,102 +647,152 @@ menuentry "Xeno OS (Universal)" {
 }
 EOF
 
-# ── 7.5 Smart Lean Optimization (Strip caches, bytecode & heavy redundant blobs) ──
-echo "Optimizing rootfs footprint (purging temporary build caches, bytecode, CUDA bundles, and obsolete headers)..."
-rm -rf "$ROOTFS/root/.cache" "$ROOTFS/root/.npm" "$ROOTFS/root/.cargo/registry" 2>/dev/null || true
-rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* 2>/dev/null || true
-rm -rf "$ROOTFS/tmp"/* "$ROOTFS/var/tmp"/* "$ROOTFS/var/log"/* 2>/dev/null || true
-rm -rf "$ROOTFS/usr/src/linux-headers-"* 2>/dev/null || true
-# Strip pre-bundled 2GB static CUDA runtimes (Ollama pulls them on-demand if Nvidia GPU is present)
-rm -rf "$ROOTFS/usr/local/lib/ollama/cuda_v12" "$ROOTFS/usr/local/lib/ollama/cuda_v13" 2>/dev/null || true
-# Clean only empty stale module directories (preserve all valid module trees for safe boot)
-find "$ROOTFS/usr/lib/modules" -mindepth 1 -maxdepth 1 -type d -empty -delete 2>/dev/null || true
-# Purge non-essential locale packs in Flatpak runtimes
-rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*.Locale 2>/dev/null || true
-find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+# ── STAGE 7: Optimization & Smart SquashFS Compression ───────
+render_stage_progress 7
+optimize_rootfs_caches() {
+    rm -rf "$ROOTFS/root/.cache" "$ROOTFS/root/.npm" "$ROOTFS/root/.cargo/registry" 2>/dev/null || true
+    rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* 2>/dev/null || true
+    rm -rf "$ROOTFS/tmp"/* "$ROOTFS/var/tmp"/* "$ROOTFS/var/log"/* 2>/dev/null || true
+    rm -rf "$ROOTFS/usr/src/linux-headers-"* 2>/dev/null || true
+    rm -rf "$ROOTFS/usr/local/lib/ollama/cuda_v12" "$ROOTFS/usr/local/lib/ollama/cuda_v13" 2>/dev/null || true
+    find "$ROOTFS/usr/lib/modules" -mindepth 1 -maxdepth 1 -type d -empty -delete 2>/dev/null || true
+    rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*.Locale 2>/dev/null || true
+    find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
 
-# ── 8. SquashFS (Smart High-Compression ZSTD L19) ─────────────
-mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/tmp" "$ROOTFS/run"
-touch "$ROOTFS/proc/.keep" "$ROOTFS/sys/.keep" "$ROOTFS/dev/.keep" "$ROOTFS/tmp/.keep" "$ROOTFS/run/.keep"
+    mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/tmp" "$ROOTFS/run"
+    touch "$ROOTFS/proc/.keep" "$ROOTFS/sys/.keep" "$ROOTFS/dev/.keep" "$ROOTFS/tmp/.keep" "$ROOTFS/run/.keep"
+}
+run_with_spinner "Purging temporary build caches, bytecode, and CUDA runtimes" 10 optimize_rootfs_caches
 
-echo "Compressing root filesystem into smart optimized SquashFS (ZSTD L19, 1MB blocks)..."
-mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
-    -comp zstd -Xcompression-level 19 -b 1M -noappend \
-    -wildcards \
-    -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
-    -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
-    -e "root/.cache/*" "root/.npm/*" "root/.cargo/registry/*" \
-    -e "home/*/.cache/*" \
-    -e "usr/share/doc/*" "usr/share/man/*" "usr/share/info/*" "usr/share/help/*" \
-    -e "usr/include/*" "usr/src/*" \
-    -e "usr/local/lib/ollama/cuda_*" \
-    -e "var/lib/flatpak/runtime/*/*.Locale/*" \
-    -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
-    -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
-
-# Generate filesystem.size for Casper live boot validation
+build_squashfs_image() {
+    mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
+        -comp zstd -Xcompression-level 19 -b 1M -noappend \
+        -wildcards \
+        -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
+        -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
+        -e "root/.cache/*" "root/.npm/*" "root/.cargo/registry/*" \
+        -e "home/*/.cache/*" \
+        -e "usr/share/doc/*" "usr/share/man/*" "usr/share/info/*" "usr/share/help/*" \
+        -e "usr/include/*" "usr/src/*" \
+        -e "usr/local/lib/ollama/cuda_*" \
+        -e "var/lib/flatpak/runtime/*/*.Locale/*" \
+        -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
+        -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
+}
+run_with_spinner "Compressing RootFS into SquashFS (ZSTD L19, 1MB blocks)" 80 build_squashfs_image
 printf "%s\n" "$(du -sx --block-size=1 "$ROOTFS" | cut -f1)" > "$WS_DIR/iso/build/casper/filesystem.size"
 
-# ── 9. GRUB ISO (Dual BIOS i386-pc + UEFI x86_64-efi via wrapper) ──
-mkdir -p "$WS_DIR/iso/build/boot/grub/i386-pc" "$WS_DIR/iso/build/boot/grub/x86_64-efi" "$WS_DIR/iso/build/EFI/BOOT"
-cp -r /usr/lib/grub/i386-pc/* "$WS_DIR/iso/build/boot/grub/i386-pc/" 2>/dev/null || true
+# ── STAGE 8: GRUB Bootloaders Assembly (Dual BIOS + UEFI) ────
+render_stage_progress 8
+assemble_bootloaders() {
+    mkdir -p "$WS_DIR/iso/build/boot/grub/i386-pc" "$WS_DIR/iso/build/boot/grub/x86_64-efi" "$WS_DIR/iso/build/EFI/BOOT"
+    cp -r /usr/lib/grub/i386-pc/* "$WS_DIR/iso/build/boot/grub/i386-pc/" 2>/dev/null || true
 
-grub-mkimage -O i386-pc -o "$WS_DIR/iso/build/boot/grub/i386-pc/eltorito.img" \
-    -p '(cd0)/boot/grub' iso9660 biosdisk normal
+    grub-mkimage -O i386-pc -o "$WS_DIR/iso/build/boot/grub/i386-pc/eltorito.img" \
+        -p '(cd0)/boot/grub' iso9660 biosdisk normal
 
-# Generate standalone UEFI boot binary (BOOTX64.EFI) and FAT EFI System Partition image (efi.img)
-if [ -d "/usr/lib/grub/x86_64-efi" ]; then
-    echo "Building UEFI x86_64-efi bootloader..."
-    cp -r /usr/lib/grub/x86_64-efi/* "$WS_DIR/iso/build/boot/grub/x86_64-efi/" 2>/dev/null || true
-    
-    grub-mkimage -O x86_64-efi -o "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" \
-        -p '/boot/grub' iso9660 fat part_gpt part_msdos normal boot linux configfile tar search search_fs_file search_label search_fs_uuid efi_gop efi_uga gfxterm gfxmenu
-    
-    # Generate FAT EFI System Partition image (efi.img) for El Torito alt boot / UEFI hardware compatibility
-    dd if=/dev/zero of="$WS_DIR/iso/build/boot/grub/efi.img" bs=1k count=4096 2>/dev/null || true
-    mkfs.vfat "$WS_DIR/iso/build/boot/grub/efi.img" 2>/dev/null || true
-    if command -v mcopy >/dev/null 2>&1; then
-        mmd -i "$WS_DIR/iso/build/boot/grub/efi.img" ::EFI ::EFI/BOOT 2>/dev/null || true
-        mcopy -i "$WS_DIR/iso/build/boot/grub/efi.img" "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI 2>/dev/null || true
+    if [ -d "/usr/lib/grub/x86_64-efi" ]; then
+        cp -r /usr/lib/grub/x86_64-efi/* "$WS_DIR/iso/build/boot/grub/x86_64-efi/" 2>/dev/null || true
+        
+        grub-mkimage -O x86_64-efi -o "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" \
+            -p '/boot/grub' iso9660 fat part_gpt part_msdos normal boot linux configfile tar search search_fs_file search_label search_fs_uuid efi_gop efi_uga gfxterm gfxmenu
+        
+        dd if=/dev/zero of="$WS_DIR/iso/build/boot/grub/efi.img" bs=1k count=4096 2>/dev/null || true
+        mkfs.vfat "$WS_DIR/iso/build/boot/grub/efi.img" 2>/dev/null || true
+        if command -v mcopy >/dev/null 2>&1; then
+            mmd -i "$WS_DIR/iso/build/boot/grub/efi.img" ::EFI ::EFI/BOOT 2>/dev/null || true
+            mcopy -i "$WS_DIR/iso/build/boot/grub/efi.img" "$WS_DIR/iso/build/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI 2>/dev/null || true
+        fi
     fi
-fi
+}
+run_with_spinner "Generating BIOS & UEFI boot images (BOOTX64.EFI & efi.img)" 15 assemble_bootloaders
 
-echo "Generating bootable ISO (${ISO_NAME}) in ${TIER_NAME}..."
-mkdir -p "$OUTPUT_DIR"
+# ── STAGE 9: ISO Generation & Verification ───────────────────
+render_stage_progress 9
 LOCAL_ISO_PATH="$OUTPUT_DIR/${ISO_NAME}"
 
-grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
-    -volid "$VOLUME_ID" \
-    -o "$LOCAL_ISO_PATH" "$WS_DIR/iso/build/"
+generate_iso_master() {
+    grub-mkrescue --xorriso="$WS_DIR/xorriso-wrapper.sh" \
+        -volid "$VOLUME_ID" \
+        -o "$LOCAL_ISO_PATH" "$WS_DIR/iso/build/"
+}
+run_with_spinner "Building bootable ISO image via xorriso-wrapper (Level 3)" 30 generate_iso_master
 
-# Generate SHA256 checksum for ISO artifact validation
-echo "Generating SHA256 checksum..."
 (cd "$OUTPUT_DIR" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
-
-# Maintain root output convenience symlink
 ln -sf "$LOCAL_ISO_PATH" "$WS_DIR/iso/output/${ISO_NAME}" 2>/dev/null || true
 ln -sf "${LOCAL_ISO_PATH}.sha256" "$WS_DIR/iso/output/${ISO_NAME}.sha256" 2>/dev/null || true
 
 if [ -d "$WIN_HOST_DIR" ]; then
-    mkdir -p "$WIN_HOST_DIR/$TIER_NAME" 2>/dev/null || true
-    echo "Copying ISO artifact to Windows host directory ($WIN_HOST_DIR/$TIER_NAME/${ISO_NAME})..."
-    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" 2>/dev/null || dd if="$LOCAL_ISO_PATH" of="$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" bs=64M conv=fsync 2>/dev/null || true
-    cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}.sha256" 2>/dev/null || true
-    # Also copy root mirror
-    cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || true
-    cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/${ISO_NAME}.sha256" 2>/dev/null || true
+    copy_win_host() {
+        mkdir -p "$WIN_HOST_DIR/$TIER_NAME" 2>/dev/null || true
+        cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" 2>/dev/null || dd if="$LOCAL_ISO_PATH" of="$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}" bs=64M conv=fsync 2>/dev/null || true
+        cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/$TIER_NAME/${ISO_NAME}.sha256" 2>/dev/null || true
+        cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || true
+        cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/${ISO_NAME}.sha256" 2>/dev/null || true
+    }
+    run_with_spinner "Synchronizing ISO artifact to Windows host directory" 8 copy_win_host
 fi
 
-# Calculate next version for display log
-NEXT_VERSION=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(round(float(m.group(1)) + 0.5, 1) if m else '4.5')")
+BUILD_END_TIME=$(date +%s)
+TOTAL_BUILD_SECS=$(( BUILD_END_TIME - BUILD_START_TIME ))
+BUILD_MINS=$(( TOTAL_BUILD_SECS / 60 ))
+BUILD_SECS=$(( TOTAL_BUILD_SECS % 60 ))
 
-echo "=== AUTOMATED PIPELINE COMPLETE ==="
-echo "ISO: $TARGET_ISO"
-echo "SHA256: $(cat "${LOCAL_ISO_PATH}.sha256" | awk '{print $1}')"
-echo "Boot kernel: $KVER"
-echo "Next build version queued: v${NEXT_VERSION}"
-if [ "$KERNEL_VALID" != "1" ]; then
-    echo "NOTE: Custom Xeno kernel was INVALID — ISO used fallback generic kernel."
-    echo "      Rebuild kernel CI to restore XanMod + injection + full WLAN."
+ISO_BYTES=$(stat -c%s "$LOCAL_ISO_PATH" 2>/dev/null || echo 0)
+ISO_SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$ISO_BYTES" 2>/dev/null || echo "0B")
+SHA256_HASH=$(cat "${LOCAL_ISO_PATH}.sha256" 2>/dev/null | awk '{print $1}' || echo "N/A")
+NEXT_VERSION=$(python3 - << PY_EOF
+import re
+current = "$BUILD_VERSION".strip()
+is_beta = bool(re.search(r'beta', current, re.IGNORECASE))
+is_omega = bool(re.search(r'omega', current, re.IGNORECASE))
+is_alpha = bool(re.search(r'alpha', current, re.IGNORECASE))
+recreate = "${XENO_RECREATE_ISO:-0}" == "1"
+
+m = re.search(r'([0-9]+(?:\.[0-9]+)?)', current)
+num = float(m.group(1)) if m else 9.0
+
+if recreate:
+    print(f"{current} (Snapshot Freeze)")
+elif is_beta:
+    if num >= 10.0:
+        # v10 is the final version for the beta series!
+        print("10.0-beta (Final Beta Milestone)")
+    else:
+        next_num = min(10.0, round(num + 0.5, 1))
+        print(f"{next_num}-beta")
+elif is_omega:
+    next_num = round(num + 0.1, 1)
+    print(f"{next_num}-omega")
+elif is_alpha:
+    next_num = round(num + 0.5, 1)
+    print(f"{next_num}-alpha")
+else:
+    next_num = round(num + 0.5, 1)
+    print(f"{next_num}")
+PY_EOF
+)
+
+if [ "${XENO_RECREATE_ISO:-0}" != "1" ] && [[ "$NEXT_VERSION" != *"Final Beta Milestone"* ]] && [[ "$NEXT_VERSION" != *"Snapshot Freeze"* ]]; then
+    echo "$NEXT_VERSION" > "$VERSION_FILE" 2>/dev/null || true
+fi
+
+echo -e "\n${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+echo -e "${C_BOLD}                   XENO OS BUILD PIPELINE COMPLETION REPORT                    ${C_RESET}"
+echo -e "${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+printf "  Master Progress:  %b\n" "$(render_bar 100 100 28 "$C_GREEN")"
+echo -e "  Target Edition:   ${C_BOLD}${TIER_NAME}${C_RESET}"
+echo -e "  ISO Artifact:     ${C_CYAN}${TARGET_ISO}${C_RESET}"
+echo -e "  Artifact Size:    ${C_GREEN}${ISO_SIZE_HUMAN}${C_RESET} (${ISO_BYTES} bytes)"
+echo -e "  SHA256 Checksum:  ${C_YELLOW}${SHA256_HASH}${C_RESET}"
+echo -e "  Boot Kernel:      ${C_BLUE}${KVER}${C_RESET}"
+echo -e "  Actual Duration:  ${C_CYAN}${BUILD_MINS}m ${BUILD_SECS}s${C_RESET} (${TOTAL_BUILD_SECS}s / target ~${TOTAL_ESTIMATED_SECS}s)"
+echo -e "  Queued Version:   ${C_DIM}v${NEXT_VERSION}${C_RESET}"
+echo -e "${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
+
+if [ "$KERNEL_VALID" = "1" ]; then
+    echo -e "${C_GREEN}${C_BOLD}✔ ISO PACKAGING COMPLETE — XANMOD BORE KERNEL & INJECTION CERTIFIED${C_RESET}\n"
+else
+    echo -e "${C_YELLOW}${C_BOLD}⚠ ISO PACKAGING COMPLETE — GENERIC FALLBACK KERNEL (CUSTOM KERNEL WAS INVALID)${C_RESET}\n"
 fi

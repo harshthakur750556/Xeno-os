@@ -18,7 +18,10 @@ CACHE_DIR="$WS_DIR/kernel/cache"
 OUT_DIR="$WS_DIR/kernel/output"
 META_FILE="$CACHE_DIR/latest_release.json"
 
-# ── Cyber-Nord Visual Tokens ─────────────────────────────────────────────────
+# ── Cyber-Nord Visual Tokens & Terminal Capabilities ─────────────────────────
+IS_TTY=0
+[ -t 1 ] && [ "${TERM:-}" != "dumb" ] && IS_TTY=1
+
 C_RESET="\033[0m"
 C_BOLD="\033[1m"
 C_DIM="\033[2m"
@@ -30,6 +33,118 @@ C_YELLOW="\033[38;2;235;203;139m"  # Nord Aurora Yellow (#EBCB8B)
 C_RED="\033[38;2;191;97;106m"      # Nord Aurora Red (#BF616A)
 C_MAGENTA="\033[38;2;180;142;173m" # Nord Aurora Purple (#B48EAD)
 C_TEXT="\033[38;2;236;239;244m"     # Nord Snow Storm (#ECEFF4)
+
+# ── Dynamic Progress Bars & Telemetry Graphs Engine ─────────────────────────
+
+# Render a graphical progress/usage bar: render_bar <value> <max> <width> <color>
+render_bar() {
+    local val="${1:-0}" max="${2:-100}" width="${3:-20}" color="${4:-$C_CYAN}"
+    [ "$max" -le 0 ] 2>/dev/null && max=100
+    [ "$val" -lt 0 ] 2>/dev/null && val=0
+    [ "$val" -gt "$max" ] 2>/dev/null && val="$max"
+    local pct=$(( val * 100 / max ))
+    local filled=$(( val * width / max ))
+    local empty=$(( width - filled ))
+    local bar=""
+    for ((b=0; b<filled; b++)); do bar+="█"; done
+    local empty_bar=""
+    for ((b=0; b<empty; b++)); do empty_bar+="░"; done
+    printf "${color}%s${C_DIM}%s${C_RESET} %3d%%" "$bar" "$empty_bar" "$pct"
+}
+
+# Live Telemetry Snapshot Box (CPU Load %, RAM Used/Total, and RootFS Disk Free)
+render_telemetry_dashboard() {
+    # 1. CPU Usage
+    local cpu_usage=0
+    if [ -f /proc/stat ]; then
+        local cpu_idle
+        cpu_idle=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $8}' | cut -d'.' -f1 || echo 85)
+        cpu_usage=$(( 100 - ${cpu_idle:-85} ))
+        [ "$cpu_usage" -lt 0 ] && cpu_usage=0
+        [ "$cpu_usage" -gt 100 ] && cpu_usage=100
+    fi
+
+    # 2. RAM Usage
+    local ram_total="16.0" ram_used="4.0" ram_pct=25
+    if [ -f /proc/meminfo ]; then
+        local t u a
+        t=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 16777216)
+        a=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 12582912)
+        u=$(( t - a ))
+        ram_total=$(awk "BEGIN {printf \"%.1f\", $t / 1048576}")
+        ram_used=$(awk "BEGIN {printf \"%.1f\", $u / 1048576}")
+        ram_pct=$(( u * 100 / (t > 0 ? t : 1) ))
+    fi
+
+    # 3. RootFS / Workspace Disk Usage
+    local disk_free="50G" disk_pct=30
+    if command -v df >/dev/null 2>&1; then
+        disk_pct=$(df -h "$WS_DIR" 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%' || echo 30)
+        disk_free=$(df -h "$WS_DIR" 2>/dev/null | awk 'NR==2 {print $4}' || echo "50G")
+    fi
+    local disk_used_pct=${disk_pct:-30}
+
+    echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}SYSTEM TELEMETRY & LIVE RESOURCE GAUGES${C_RESET}                                     ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}CPU Load:${C_RESET}  %-36b ${C_DIM}│${C_RESET} Load:  %3d%%        ${C_DIM}│${C_RESET}\n" "$(render_bar "$cpu_usage" 100 18 "$C_CYAN")" "$cpu_usage"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}RAM Usage:${C_RESET} %-36b ${C_DIM}│${C_RESET} %5s / %-5s GB ${C_DIM}│${C_RESET}\n" "$(render_bar "$ram_pct" 100 18 "$C_GREEN")" "$ram_used" "$ram_total"
+    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Disk Used:${C_RESET} %-36b ${C_DIM}│${C_RESET} %5s free      ${C_DIM}│${C_RESET}\n" "$(render_bar "$disk_used_pct" 100 18 "$C_BLUE")" "$disk_free"
+    echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
+}
+
+# Live Spinner for Background Tasks: run_with_spinner "Task description" command args...
+run_with_spinner() {
+    local label="$1"
+    shift
+    if [ "$IS_TTY" -eq 0 ]; then
+        echo -e "  -> ${label}..."
+        "$@"
+        local rc=$?
+        [ $rc -eq 0 ] && echo -e "  ${C_GREEN}✔ [DONE]${C_RESET} ${label}" || echo -e "  ${C_RED}✖ [FAIL]${C_RESET} ${label} (exit $rc)"
+        return $rc
+    fi
+
+    local spin_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local log_file
+    log_file=$(mktemp /tmp/xeno_spin_XXXXXX.log 2>/dev/null || echo "/tmp/xeno_spin_$$.log")
+    
+    "$@" > "$log_file" 2>&1 &
+    local pid=$!
+    local start_time
+    start_time=$(date +%s)
+    local i=0
+
+    while kill -0 "$pid" 2>/dev/null; do
+        local now
+        now=$(date +%s)
+        local elapsed=$(( now - start_time ))
+        local mins=$(( elapsed / 60 ))
+        local secs=$(( elapsed % 60 ))
+        printf "\r  ${C_CYAN}%s${C_RESET} %-52s ${C_DIM}[%02d:%02d]${C_RESET}" "${spin_chars[i]}" "${label}..." "$mins" "$secs"
+        i=$(( (i + 1) % ${#spin_chars[@]} ))
+        sleep 0.1
+    done
+
+    wait "$pid"
+    local rc=$?
+    local now
+    now=$(date +%s)
+    local elapsed=$(( now - start_time ))
+    local mins=$(( elapsed / 60 ))
+    local secs=$(( elapsed % 60 ))
+
+    if [ $rc -eq 0 ]; then
+        printf "\r  ${C_GREEN}✔ [DONE]${C_RESET} %-52s ${C_GREEN}[%02d:%02d]${C_RESET}\033[K\n" "${label}" "$mins" "$secs"
+        rm -f "$log_file"
+        return 0
+    else
+        printf "\r  ${C_RED}✖ [FAIL]${C_RESET} %-52s ${C_RED}[%02d:%02d] (code %d)${C_RESET}\033[K\n" "${label}" "$mins" "$secs" "$rc"
+        tail -n 10 "$log_file" 2>/dev/null || true
+        rm -f "$log_file"
+        return $rc
+    fi
+}
 
 # ── Shared Chroot Helpers ───────────────────────────────────────────────────
 xeno_chroot_mount() {
@@ -92,6 +207,7 @@ print_banner() {
 BANNER_EOF
     echo -e "${C_BLUE} ═══ XENO REAPER — UNIFIED OS LIFECYCLE & DIAGNOSTIC COMMAND CENTER ═══${C_RESET}"
     echo -e "${C_DIM} Workspace: ${WS_DIR} | RootFS: ${ROOTFS}${C_RESET}\n"
+    render_telemetry_dashboard
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -180,11 +296,21 @@ run_master_doctor() {
 
     local c_pass=0 c_warn=0 c_fail=0 c_fixed=0
 
+    # Helper for tier headers with dynamic progress bar
+    render_doctor_tier() {
+        local tier_num="$1" total_tiers="$2" tier_title="$3"
+        local pct=$(( tier_num * 100 / total_tiers ))
+        local bar
+        bar=$(render_bar "$tier_num" "$total_tiers" 20 "$C_BLUE")
+        echo -e "\n${C_BOLD}${C_CYAN}── Tier [${tier_num}/${total_tiers}] (${pct}%): ${tier_title} ──${C_RESET}"
+        [ "$IS_TTY" -eq 1 ] && echo -e "   ${C_DIM}Audit Progress:${C_RESET} ${bar}\n"
+    }
+
     # TIER 1: Host Tooling
-    echo -e "${C_BOLD}${C_BLUE}── Tier 1: Host Build Tools & System Resources ──${C_RESET}"
+    render_doctor_tier 1 8 "Host Build Tools & System Resources"
     for tool in xorriso mksquashfs grub-mkimage python3 bun git sha256sum; do
         if command -v "$tool" >/dev/null 2>&1; then
-            echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Host tool present: $tool ($(command -v "$tool"))"
+            echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Host tool present: $tool (${C_DIM}$(command -v "$tool")${C_RESET})"
             ((c_pass++))
         else
             echo -e "  ${C_RED}✖ [FAIL]${C_RESET} Missing host tool: $tool"
@@ -196,9 +322,9 @@ run_master_doctor() {
     done
 
     # TIER 2: RootFS Structure & Security Limits
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 2: RootFS Integrity & Security Limits ──${C_RESET}"
+    render_doctor_tier 2 8 "RootFS Integrity & Security Limits"
     if [ -d "$ROOTFS" ]; then
-        echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} RootFS directory exists at: $ROOTFS"
+        echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} RootFS directory exists at: ${C_DIM}$ROOTFS${C_RESET}"
         ((c_pass++))
         for m in proc sys dev tmp run etc usr/bin var/log; do
             if [ -d "$ROOTFS/$m" ]; then
@@ -219,7 +345,7 @@ run_master_doctor() {
             echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Scoped realtime PAM limits configured properly"
             ((c_pass++))
         else
-            echo -e "  ${C_WARN}⚠ [WARN]${C_RESET} Missing 99-hyprland.conf limits file"
+            echo -e "  ${C_YELLOW}⚠ [WARN]${C_RESET} Missing 99-hyprland.conf limits file"
             ((c_warn++))
         fi
     else
@@ -228,7 +354,7 @@ run_master_doctor() {
     fi
 
     # TIER 3: Kernel Packages & Wireless Drivers
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 3: Kernel Packages & Wireless Drivers ──${C_RESET}"
+    render_doctor_tier 3 8 "Kernel Packages & Wireless Drivers"
     if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Found staged XanMod kernel deb package(s) in kernel/cache/"
         ((c_pass++))
@@ -247,7 +373,7 @@ run_master_doctor() {
     fi
 
     # TIER 4: Security Stack & Pinning
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 4: Security Stack & Kali APT Pinning ──${C_RESET}"
+    render_doctor_tier 4 8 "Security Stack & Kali APT Pinning"
     if [ -f "$ROOTFS/etc/apt/preferences.d/kali-pinning" ]; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Kali APT repository pinning active (Priority 100)"
         ((c_pass++))
@@ -257,7 +383,7 @@ run_master_doctor() {
     fi
 
     # TIER 5: Compatibility Layer (Wine, AppImage, Flatpak)
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 5: Cross-Platform Compatibility Layer ──${C_RESET}"
+    render_doctor_tier 5 8 "Cross-Platform Compatibility Layer"
     if [ -e "$ROOTFS/usr/bin/wine" ] || [ -f "$ROOTFS/usr/lib/wine/wine64" ]; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Wine execution layer installed"
         ((c_pass++))
@@ -274,7 +400,7 @@ run_master_doctor() {
     fi
 
     # TIER 6: Desktop Shell TypeScript & Astal
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 6: TypeScript Desktop Shell & Astal v2 ──${C_RESET}"
+    render_doctor_tier 6 8 "TypeScript Desktop Shell & Astal v2"
     if [ -d "$WS_DIR/desktop/shell" ]; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Desktop shell source directory exists"
         ((c_pass++))
@@ -290,7 +416,7 @@ run_master_doctor() {
     fi
 
     # TIER 7: Automated Test Execution
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 7: Automated Integration & Adversarial Test Suites ──${C_RESET}"
+    render_doctor_tier 7 8 "Automated Integration & Adversarial Test Suites"
     echo -e "  -> Running 23 Adversarial IPC boundary tests..."
     if run_tests_suite adv >/dev/null 2>&1; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} Adversarial IPC test suite passed: 23/23 tests OK"
@@ -309,7 +435,7 @@ run_master_doctor() {
     fi
 
     # TIER 8: ISO Packaging & Bootloader Sanity
-    echo -e "\n${C_BOLD}${C_BLUE}── Tier 8: ISO Packaging Layout & Bootloader Integrity ──${C_RESET}"
+    render_doctor_tier 8 8 "ISO Packaging Layout & Bootloader Integrity"
     if [ -x "$WS_DIR/xorriso-wrapper.sh" ]; then
         echo -e "  ${C_GREEN}✔ [PASS]${C_RESET} xorriso-wrapper.sh configured with mandatory ISO Level 3 override"
         ((c_pass++))
@@ -322,10 +448,15 @@ run_master_doctor() {
         ((c_pass++))
     fi
 
+    local total_checks=$(( c_pass + c_warn + c_fail ))
+    local health_pct=100
+    [ "$total_checks" -gt 0 ] && health_pct=$(( (c_pass * 100) / total_checks ))
+
     echo -e "\n${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
     echo -e "${C_BOLD}                       XENO OS MASTER DIAGNOSTIC REPORT                        ${C_RESET}"
     echo -e "${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "  Passed Checks:    ${C_GREEN}${c_pass}${C_RESET}"
+    printf "  Health Index:     %b\n" "$(render_bar "$health_pct" 100 24 "$([ "$c_fail" -eq 0 ] && echo "$C_GREEN" || echo "$C_RED")")"
+    echo -e "  Passed Checks:    ${C_GREEN}${c_pass}${C_RESET} / ${total_checks}"
     echo -e "  Warnings:         ${C_YELLOW}${c_warn}${C_RESET}"
     echo -e "  Failed Checks:    ${C_RED}${c_fail}${C_RESET}"
     echo -e "  Auto-Fixed Items: ${C_MAGENTA}${c_fixed}${C_RESET}"
@@ -1443,7 +1574,78 @@ class XenoE2ETestCase(unittest.TestCase):
         if limits_match:
             self.assertNotIn("*" + " soft rtprio", limits_match.group(1))
 
-# ── 5. Main Execution Dispatcher ──
+# ── 5. Cyber-Nord Live Real-Time Dynamic Test Runner ──
+class CyberNordTestResult(unittest.TestResult):
+    def __init__(self, stream=None, descriptions=None, verbosity=None, total_tests=0):
+        super().__init__(stream, descriptions, verbosity)
+        self.total_tests = total_tests
+        self.count = 0
+        self.passed = 0
+        self.start_time = time.time()
+        self.spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        self.spin_idx = 0
+        self.is_tty = sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+
+    def _render_progress(self, current_test_name=""):
+        if not self.is_tty:
+            return
+        pct = int((self.count / max(1, self.total_tests)) * 100)
+        bar_width = 20
+        filled = int((self.count / max(1, self.total_tests)) * bar_width)
+        empty = bar_width - filled
+        bar = "█" * filled + "░" * empty
+        elapsed = int(time.time() - self.start_time)
+        mins, secs = elapsed // 60, elapsed % 60
+        spin = self.spinners[self.spin_idx % len(self.spinners)]
+        self.spin_idx += 1
+        
+        max_name_len = 34
+        short_name = current_test_name
+        if len(short_name) > max_name_len:
+            short_name = short_name[:max_name_len - 3] + "..."
+            
+        line = f"\r  \033[38;2;136;192;208m{spin}\033[0m [\033[38;2;136;192;208m{bar}\033[0m] \033[1m{pct:3d}%\033[0m ({self.count:2d}/{self.total_tests}) │ \033[38;2;163;190;140m✔ {self.passed}\033[0m │ \033[38;2;191;97;106m✖ {len(self.failures) + len(self.errors)}\033[0m │ \033[2m[{mins:02d}:{secs:02d}]\033[0m \033[38;2;129;161;193m{short_name:<34}\033[0m\033[K"
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+    def startTest(self, test):
+        super().startTest(test)
+        self._render_progress(test._testMethodName)
+
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        self.count += 1
+        self.passed += 1
+        if not self.is_tty:
+            print(f"  ✔ [PASS] ({self.count}/{self.total_tests}) {test._testMethodName}")
+        else:
+            self._render_progress(test._testMethodName)
+
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        self.count += 1
+        if not self.is_tty:
+            print(f"  ✖ [FAIL] ({self.count}/{self.total_tests}) {test._testMethodName}")
+        else:
+            self._render_progress(test._testMethodName)
+
+    def addError(self, test, err):
+        super().addError(test, err)
+        self.count += 1
+        if not self.is_tty:
+            print(f"  ✖ [ERROR] ({self.count}/{self.total_tests}) {test._testMethodName}")
+        else:
+            self._render_progress(test._testMethodName)
+
+    def addSkip(self, test, reason):
+        super().addSkip(test, reason)
+        self.count += 1
+        if not self.is_tty:
+            print(f"  ⚠ [SKIP] ({self.count}/{self.total_tests}) {test._testMethodName} ({reason})")
+        else:
+            self._render_progress(test._testMethodName)
+
+# ── 6. Main Execution Dispatcher ──
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     loader = unittest.TestLoader()
@@ -1458,9 +1660,43 @@ if __name__ == "__main__":
     else: # all
         suite.addTests(loader.loadTestsFromTestCase(XenoAdversarialTestCase))
         suite.addTests(loader.loadTestsFromTestCase(XenoE2ETestCase))
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    sys.exit(0 if result.wasSuccessful() else 1)
+
+    total = suite.countTestCases()
+    result = CyberNordTestResult(total_tests=total)
+    suite.run(result)
+
+    elapsed = time.time() - result.start_time
+    mins, secs = int(elapsed // 60), int(elapsed % 60)
+    total_fails = len(result.failures) + len(result.errors)
+    pass_pct = (result.passed / max(1, total)) * 100
+
+    bar_width = 24
+    filled = int((result.passed / max(1, total)) * bar_width)
+    bar = "█" * filled + "░" * (bar_width - filled)
+    bar_color = "\033[38;2;163;190;140m" if total_fails == 0 else "\033[38;2;191;97;106m"
+
+    if result.is_tty:
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+
+    print("\n\033[1m═══════════════════════════════════════════════════════════════════════════════\033[0m")
+    print("\033[1m                     XENO OS AUTOMATED TEST SUITE REPORT                       \033[0m")
+    print("\033[1m═══════════════════════════════════════════════════════════════════════════════\033[0m")
+    print(f"  Pass Rate Gauge: [{bar_color}{bar}\033[0m] \033[1m{pass_pct:5.1f}%\033[0m")
+    print(f"  Total Executed:  \033[1m{result.count}\033[0m / {total}")
+    print(f"  Passed Tests:    \033[38;2;163;190;140m\033[1m{result.passed}\033[0m")
+    print(f"  Failed Tests:    \033[38;2;191;97;106m\033[1m{total_fails}\033[0m")
+    print(f"  Elapsed Time:    \033[38;2;136;192;208m{mins:02d}m {secs:02d}s ({elapsed:.2f}s)\033[0m")
+    print("\033[1m═══════════════════════════════════════════════════════════════════════════════\033[0m")
+
+    if total_fails == 0:
+        print("\033[38;2;163;190;140m\033[1m✔ ALL AUTOMATED TEST SUITES PASSED (100% CONFORMITY)\033[0m\n")
+    else:
+        print("\033[38;2;191;97;106m\033[1m✖ TEST FAILURES DETECTED:\033[0m")
+        for test, trace in result.failures + result.errors:
+            print(f"\n\033[1m[FAIL] {test}\033[0m\n{trace}")
+        print()
+    sys.exit(0 if total_fails == 0 else 1)
 XENO_TEST_RUNNER_EOF
 }
 
@@ -2184,8 +2420,19 @@ show_menu() {
             13) run_setup_ai ;;
             14) run_enter_chroot ;;
             15) 
-                echo "Invoking Smart Lean ISO Packaging Pipeline..."
-                sudo bash "$WS_DIR/scripts/auto-build.sh"
+                echo -e "${C_CYAN}${C_BOLD}▶ [ISO PACKAGING PIPELINE]${C_RESET}"
+                echo -e "  ${C_GREEN}[1]${C_RESET} Launch Build with Currently Queued Milestone"
+                echo -e "  ${C_BLUE}[2]${C_RESET} Open Designer Edition & Release Target Matrix Selector"
+                echo -e "  ${C_YELLOW}[3]${C_RESET} Recreate Current / Final Milestone Snapshot (Version Freeze)"
+                echo -e "  ${C_DIM}[0] Return to Main Menu${C_RESET}\n"
+                read -rp "Select action [1-3] (default: 1): " pkg_choice
+                pkg_choice="${pkg_choice:-1}"
+                case "$pkg_choice" in
+                    2) sudo bash "$WS_DIR/scripts/auto-build.sh" --select ;;
+                    3) sudo bash "$WS_DIR/scripts/auto-build.sh" --recreate ;;
+                    0) echo "Returning to menu." ;;
+                    *) sudo bash "$WS_DIR/scripts/auto-build.sh" ;;
+                esac
                 ;;
             0|q|exit)
                 echo "Exiting Xeno Reaper."
@@ -2266,9 +2513,12 @@ case "$1" in
         print_banner
         run_enter_chroot
         ;;
+    --select-tier|select-tier|--select-edition|select-edition|--select|select)
+        exec sudo bash "$WS_DIR/scripts/auto-build.sh" --select
+        ;;
     --build-iso|build-iso|--auto-build)
-        echo "Invoking auto-build.sh..."
-        exec sudo bash "$WS_DIR/scripts/auto-build.sh"
+        shift || true
+        exec sudo bash "$WS_DIR/scripts/auto-build.sh" "$@"
         ;;
     -h|--help|help)
         print_banner
@@ -2291,6 +2541,7 @@ Commands:
   setup-security      Configure Kali pinned repos, wireless tools & injection
   setup-ai            Configure opt-in local AI runtime & Bubblewrap sandbox
   chroot              Enter interactive rootfs chroot with safe bind mounts
+  select-tier         Open Designer Edition & Release Target Matrix Selector
   build-iso           Invoke full Smart Lean ISO packaging pipeline (auto-build.sh)
 USAGE_EOF
         exit 0
