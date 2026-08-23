@@ -1,1 +1,36 @@
-10.0-beta
+# ═══════════════════════════════════════════════════════════════════════════════
+#  XENO OS — VERSION & RELEASE TARGET METADATA MANIFEST
+# ═══════════════════════════════════════════════════════════════════════════════
+ACTIVE_VERSION=10.0-beta
+ACTIVE_TIER=BETA
+
+# Tier 1: Beta Edition (Release Candidate Channel)
+BETA_VERSION=10.0-beta
+BETA_STATUS=TARGET_READY
+BETA_BUILT=0
+BETA_PROGRESS=100
+BETA_LAST_BUILD=NONE
+BETA_ISO=xeno_os-10.0-beta.iso
+
+# Tier 2: Alpha Edition (Experimental Rolling Canary Channel)
+ALPHA_VERSION=0.0-alpha
+ALPHA_STATUS=UNINITIALIZED
+ALPHA_BUILT=0
+ALPHA_PROGRESS=0
+ALPHA_LAST_BUILD=NONE
+ALPHA_ISO=NONE
+
+# Tier 3: Omega Edition (Sovereign Gold Master Production Channel)
+OMEGA_VERSION=0.0-omega
+OMEGA_STATUS=UNINITIALIZED
+OMEGA_BUILT=0
+OMEGA_PROGRESS=0
+OMEGA_LAST_BUILD=NONE
+OMEGA_ISO=NONE
+
+# Release Artifact Telemetry Audit
+LAST_BUILD_TIMESTAMP=NONE
+LAST_BUILD_TIER=NONE
+LAST_BUILD_ISO=NONE
+LAST_BUILD_SIZE=0B
+LAST_BUILD_SHA256=NONE

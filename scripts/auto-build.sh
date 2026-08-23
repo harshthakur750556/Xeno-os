@@ -14,11 +14,36 @@ export PATH="/usr/local/bin:/usr/bin:/bin:$HOME/.bun/bin:/home/xeno/.bun/bin:${P
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION_FILE="$WS_DIR/iso/version.txt"
 mkdir -p "$WS_DIR/iso"
-if [ -f "$VERSION_FILE" ]; then
-    BUILD_VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
-else
-    BUILD_VERSION="10.0-beta"
-fi
+
+BUILD_VERSION="10.0-beta"
+ACTIVE_TIER="BETA"
+
+BETA_VERSION="10.0-beta"
+BETA_STATUS="TARGET_READY"
+BETA_BUILT=0
+BETA_PROGRESS=100
+BETA_LAST_BUILD="NONE"
+BETA_ISO="xeno_os-10.0-beta.iso"
+
+ALPHA_VERSION="0.0-alpha"
+ALPHA_STATUS="UNINITIALIZED"
+ALPHA_BUILT=0
+ALPHA_PROGRESS=0
+ALPHA_LAST_BUILD="NONE"
+ALPHA_ISO="NONE"
+
+OMEGA_VERSION="0.0-omega"
+OMEGA_STATUS="UNINITIALIZED"
+OMEGA_BUILT=0
+OMEGA_PROGRESS=0
+OMEGA_LAST_BUILD="NONE"
+OMEGA_ISO="NONE"
+
+LAST_BUILD_TIMESTAMP="NONE"
+LAST_BUILD_TIER="NONE"
+LAST_BUILD_ISO="NONE"
+LAST_BUILD_SIZE="0B"
+LAST_BUILD_SHA256="NONE"
 
 WIN_HOST_DIR="/mnt/c/Users/harsh"
 TIER_NAME="BETA VERSION"
@@ -26,20 +51,140 @@ ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
 OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
 TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
 
+load_version_manifest() {
+    if [ -f "$VERSION_FILE" ]; then
+        while IFS="=" read -r key val || [ -n "$key" ]; do
+            key=$(echo "$key" | tr -d "[:space:]")
+            val=$(echo "$val" | tr -d "[:space:]")
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [ -z "$key" ] && continue
+            case "$key" in
+                ACTIVE_VERSION) BUILD_VERSION="$val" ;;
+                ACTIVE_TIER) ACTIVE_TIER="$val" ;;
+                BETA_VERSION) BETA_VERSION="$val" ;;
+                BETA_STATUS) BETA_STATUS="$val" ;;
+                BETA_BUILT) BETA_BUILT="$val" ;;
+                BETA_PROGRESS) BETA_PROGRESS="$val" ;;
+                ALPHA_VERSION) ALPHA_VERSION="$val" ;;
+                ALPHA_STATUS) ALPHA_STATUS="$val" ;;
+                ALPHA_BUILT) ALPHA_BUILT="$val" ;;
+                ALPHA_PROGRESS) ALPHA_PROGRESS="$val" ;;
+                OMEGA_VERSION) OMEGA_VERSION="$val" ;;
+                OMEGA_STATUS) OMEGA_STATUS="$val" ;;
+                OMEGA_BUILT) OMEGA_BUILT="$val" ;;
+                OMEGA_PROGRESS) OMEGA_PROGRESS="$val" ;;
+                LAST_BUILD_TIMESTAMP) LAST_BUILD_TIMESTAMP="$val" ;;
+                LAST_BUILD_TIER) LAST_BUILD_TIER="$val" ;;
+                LAST_BUILD_ISO) LAST_BUILD_ISO="$val" ;;
+                LAST_BUILD_SIZE) LAST_BUILD_SIZE="$val" ;;
+                LAST_BUILD_SHA256) LAST_BUILD_SHA256="$val" ;;
+            esac
+        done < "$VERSION_FILE"
+    fi
+}
+
+save_version_manifest() {
+    cat > "$VERSION_FILE" << MANIFEST_EOF
+# ═══════════════════════════════════════════════════════════════════════════════
+#  XENO OS — VERSION & RELEASE TARGET METADATA MANIFEST
+# ═══════════════════════════════════════════════════════════════════════════════
+ACTIVE_VERSION=${BUILD_VERSION}
+ACTIVE_TIER=${ACTIVE_TIER}
+
+# Tier 1: Beta Edition (Release Candidate Channel)
+BETA_VERSION=${BETA_VERSION}
+BETA_STATUS=${BETA_STATUS}
+BETA_BUILT=${BETA_BUILT}
+BETA_PROGRESS=${BETA_PROGRESS}
+BETA_LAST_BUILD=${BETA_LAST_BUILD:-NONE}
+BETA_ISO=${BETA_ISO:-NONE}
+
+# Tier 2: Alpha Edition (Experimental Rolling Canary Channel)
+ALPHA_VERSION=${ALPHA_VERSION}
+ALPHA_STATUS=${ALPHA_STATUS}
+ALPHA_BUILT=${ALPHA_BUILT}
+ALPHA_PROGRESS=${ALPHA_PROGRESS}
+ALPHA_LAST_BUILD=${ALPHA_LAST_BUILD:-NONE}
+ALPHA_ISO=${ALPHA_ISO:-NONE}
+
+# Tier 3: Omega Edition (Sovereign Gold Master Production Channel)
+OMEGA_VERSION=${OMEGA_VERSION}
+OMEGA_STATUS=${OMEGA_STATUS}
+OMEGA_BUILT=${OMEGA_BUILT}
+OMEGA_PROGRESS=${OMEGA_PROGRESS}
+OMEGA_LAST_BUILD=${OMEGA_LAST_BUILD:-NONE}
+OMEGA_ISO=${OMEGA_ISO:-NONE}
+
+# Release Artifact Telemetry Audit
+LAST_BUILD_TIMESTAMP=${LAST_BUILD_TIMESTAMP:-NONE}
+LAST_BUILD_TIER=${LAST_BUILD_TIER:-NONE}
+LAST_BUILD_ISO=${LAST_BUILD_ISO:-NONE}
+LAST_BUILD_SIZE=${LAST_BUILD_SIZE:-0B}
+LAST_BUILD_SHA256=${LAST_BUILD_SHA256:-NONE}
+MANIFEST_EOF
+}
+
+audit_and_sync_manifest() {
+    load_version_manifest
+
+    # Audit on-disk ISO artifacts
+    if ls "$WS_DIR/iso/output/BETA VERSION"/xeno_os-*.iso >/dev/null 2>&1; then
+        BETA_BUILT=1
+        BETA_STATUS="BUILT"
+        BETA_PROGRESS=100
+        BETA_ISO=$(basename "$(ls -t "$WS_DIR/iso/output/BETA VERSION"/xeno_os-*.iso | head -n1)")
+    else
+        BETA_BUILT=0
+        BETA_STATUS="TARGET_READY"
+        BETA_PROGRESS=100
+    fi
+
+    if ls "$WS_DIR/iso/output/ALPHA VERSION"/xeno_os-*.iso >/dev/null 2>&1; then
+        ALPHA_BUILT=1
+        ALPHA_STATUS="BUILT"
+        ALPHA_PROGRESS=100
+        ALPHA_ISO=$(basename "$(ls -t "$WS_DIR/iso/output/ALPHA VERSION"/xeno_os-*.iso | head -n1)")
+    else
+        ALPHA_BUILT=0
+        if [ "$ALPHA_VERSION" = "0.0-alpha" ]; then
+            ALPHA_STATUS="UNINITIALIZED"
+            ALPHA_PROGRESS=0
+        fi
+    fi
+
+    if ls "$WS_DIR/iso/output/OMEGA VERSION"/xeno_os-*.iso >/dev/null 2>&1; then
+        OMEGA_BUILT=1
+        OMEGA_STATUS="BUILT"
+        OMEGA_PROGRESS=100
+        OMEGA_ISO=$(basename "$(ls -t "$WS_DIR/iso/output/OMEGA VERSION"/xeno_os-*.iso | head -n1)")
+    else
+        OMEGA_BUILT=0
+        if [ "$OMEGA_VERSION" = "0.0-omega" ]; then
+            OMEGA_STATUS="UNINITIALIZED"
+            OMEGA_PROGRESS=0
+        fi
+    fi
+}
+
 resolve_tier_and_iso() {
     if [[ "$BUILD_VERSION" =~ beta|BETA ]]; then
+        ACTIVE_TIER="BETA"
         TIER_NAME="BETA VERSION"
         ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
     elif [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
+        ACTIVE_TIER="OMEGA"
         TIER_NAME="OMEGA VERSION"
         ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
     else
+        ACTIVE_TIER="ALPHA"
         TIER_NAME="ALPHA VERSION"
         ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
     fi
     OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
     TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
 }
+
+audit_and_sync_manifest
 resolve_tier_and_iso
 
 # ── Cyber-Nord Visual Tokens & Terminal Capabilities ─────────────────────────
@@ -85,33 +230,35 @@ render_edition_selector() {
 SELECTOR_BANNER_EOF
     echo -e "${C_BLUE} ═══ XENO OS EDITION & RELEASE TARGET MATRIX ═══${C_RESET}\n"
 
+    audit_and_sync_manifest
     resolve_tier_and_iso
+
     local current_tier_badge="$C_GREEN[ BETA ]$C_RESET"
-    local current_stability="$(render_bar 80 100 16 "$C_GREEN")"
+    local current_stability="$(render_bar "$BETA_PROGRESS" 100 16 "$C_GREEN")"
     if [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
         current_tier_badge="$C_MAGENTA[ OMEGA ]$C_RESET"
-        current_stability="$(render_bar 100 100 16 "$C_MAGENTA")"
+        current_stability="$(render_bar "$OMEGA_PROGRESS" 100 16 "$C_MAGENTA")"
     elif [[ "$BUILD_VERSION" =~ alpha|ALPHA ]]; then
         current_tier_badge="$C_BLUE[ ALPHA ]$C_RESET"
-        current_stability="$(render_bar 40 100 16 "$C_BLUE")"
+        current_stability="$(render_bar "$ALPHA_PROGRESS" 100 16 "$C_BLUE")"
     fi
 
     echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
     echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}CURRENT ACTIVE TARGET MILESTONE${C_RESET}"
     echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Active Version:${C_RESET}    ${BUILD_VERSION} ${current_tier_badge}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Channel Stability:${C_RESET} ${current_stability}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Milestone Scope:${C_RESET}   ${current_stability}"
     echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Release Target:${C_RESET}    ${C_DIM}iso/output/${TIER_NAME}/${ISO_NAME}${C_RESET}"
     echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     echo -e "${C_DIM}│${C_RESET} ${C_BOLD}Select Release Channel or Milestone Action:${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_BOLD}BETA EDITION${C_RESET}    $(render_bar 80 100 14 "$C_GREEN")"
+    echo -e "${C_DIM}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_BOLD}BETA EDITION${C_RESET}    $(render_bar "$BETA_PROGRESS" 100 14 "$C_GREEN") ${C_DIM}(v10.0-beta Target Ready)${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Standard Release Candidate Pipeline (Feature-Complete Channel)${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_BLUE}[2]${C_RESET} ${C_BOLD}ALPHA EDITION${C_RESET}   $(render_bar 40 100 14 "$C_BLUE")"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BLUE}[2]${C_RESET} ${C_BOLD}ALPHA EDITION${C_RESET}   $(render_bar "$ALPHA_PROGRESS" 100 14 "$C_BLUE") ${C_DIM}($([ "$ALPHA_BUILT" = "1" ] && echo "Active Canary: $ALPHA_VERSION" || echo "Uninitialized - Not Started"))${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Experimental Rolling Canary Substrate (Cutting-Edge Development)${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_MAGENTA}[3]${C_RESET} ${C_BOLD}OMEGA EDITION${C_RESET}   $(render_bar 100 100 14 "$C_MAGENTA")"
+    echo -e "${C_DIM}│${C_RESET}  ${C_MAGENTA}[3]${C_RESET} ${C_BOLD}OMEGA EDITION${C_RESET}   $(render_bar "$OMEGA_PROGRESS" 100 14 "$C_MAGENTA") ${C_DIM}($([ "$OMEGA_BUILT" = "1" ] && echo "Production Gold Master: $OMEGA_VERSION" || echo "Uninitialized - Not Started"))${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Sovereign Master Production Gold Image (Ultimate Release Channel)${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}"
     echo -e "${C_DIM}│${C_RESET}  ${C_YELLOW}[4]${C_RESET} ${C_BOLD}RECREATE ISO${C_RESET}    ${C_YELLOW}[SNAPSHOT FREEZE]${C_RESET}"
@@ -129,29 +276,37 @@ SELECTOR_BANNER_EOF
     
     case "$ed_choice" in
         1)
-            local num
-            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(m.group(1) if m else '9.0')")
-            local val
-            val=$(python3 -c "n = float('$num'); print('10.0' if n >= 10.0 else f'{n}')")
-            BUILD_VERSION="${val}-beta"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            BUILD_VERSION="10.0-beta"
+            ACTIVE_TIER="BETA"
+            BETA_VERSION="10.0-beta"
+            BETA_STATUS="ACTIVE_TARGET"
+            BETA_PROGRESS=100
             resolve_tier_and_iso
+            save_version_manifest
             echo -e "  ${C_GREEN}✔ Shifted to Beta Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         2)
-            local num
-            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(m.group(1) if m else '1.0')")
-            BUILD_VERSION="${num}-alpha"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            if [ "$ALPHA_VERSION" = "0.0-alpha" ]; then
+                ALPHA_VERSION="1.0-alpha"
+                ALPHA_STATUS="INITIALIZED"
+                ALPHA_PROGRESS=10
+            fi
+            BUILD_VERSION="$ALPHA_VERSION"
+            ACTIVE_TIER="ALPHA"
             resolve_tier_and_iso
+            save_version_manifest
             echo -e "  ${C_BLUE}✔ Shifted to Alpha Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         3)
-            local num
-            num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print('1.0' if float(m.group(1) if m else '1.0') < 1.0 else m.group(1))")
-            BUILD_VERSION="${num}-omega"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            if [ "$OMEGA_VERSION" = "0.0-omega" ]; then
+                OMEGA_VERSION="1.0-omega"
+                OMEGA_STATUS="INITIALIZED"
+                OMEGA_PROGRESS=100
+            fi
+            BUILD_VERSION="$OMEGA_VERSION"
+            ACTIVE_TIER="OMEGA"
             resolve_tier_and_iso
+            save_version_manifest
             echo -e "  ${C_MAGENTA}✔ Shifted to Omega Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         4)
@@ -163,13 +318,14 @@ SELECTOR_BANNER_EOF
             read -rp "Enter target version string (e.g. 10.0-beta, 1.0-omega, 9.5-beta): " custom_ver
             if [ -n "$custom_ver" ]; then
                 BUILD_VERSION=$(echo "$custom_ver" | tr -d '[:space:]')
-                echo "$BUILD_VERSION" > "$VERSION_FILE"
                 resolve_tier_and_iso
+                save_version_manifest
                 echo -e "  ${C_CYAN}✔ Target version set to: ${BUILD_VERSION}${C_RESET}\n"
             fi
             ;;
         6)
             resolve_tier_and_iso
+            save_version_manifest
             echo -e "  ${C_GREEN}✔ Proceeding with currently active milestone: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         0|q|cancel)
@@ -178,6 +334,7 @@ SELECTOR_BANNER_EOF
             ;;
         *)
             resolve_tier_and_iso
+            save_version_manifest
             echo -e "  ${C_YELLOW}Continuing with active milestone: ${BUILD_VERSION}${C_RESET}\n"
             ;;
     esac
@@ -195,20 +352,33 @@ for arg in "${@:-}"; do
             ;;
         --beta|--tier-beta)
             BUILD_VERSION="10.0-beta"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            ACTIVE_TIER="BETA"
             resolve_tier_and_iso
+            save_version_manifest
             INTERACTIVE_SELECT=0
             ;;
         --alpha|--tier-alpha)
-            BUILD_VERSION="1.0-alpha"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            if [ "$ALPHA_VERSION" = "0.0-alpha" ]; then
+                ALPHA_VERSION="1.0-alpha"
+                ALPHA_STATUS="INITIALIZED"
+                ALPHA_PROGRESS=10
+            fi
+            BUILD_VERSION="$ALPHA_VERSION"
+            ACTIVE_TIER="ALPHA"
             resolve_tier_and_iso
+            save_version_manifest
             INTERACTIVE_SELECT=0
             ;;
         --omega|--tier-omega)
-            BUILD_VERSION="1.0-omega"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
+            if [ "$OMEGA_VERSION" = "0.0-omega" ]; then
+                OMEGA_VERSION="1.0-omega"
+                OMEGA_STATUS="INITIALIZED"
+                OMEGA_PROGRESS=100
+            fi
+            BUILD_VERSION="$OMEGA_VERSION"
+            ACTIVE_TIER="OMEGA"
             resolve_tier_and_iso
+            save_version_manifest
             INTERACTIVE_SELECT=0
             ;;
         --recreate|--rebuild|--recreate-beta)
@@ -218,8 +388,8 @@ for arg in "${@:-}"; do
             ;;
         --version=*|--ver=*)
             BUILD_VERSION="${arg#*=}"
-            echo "$BUILD_VERSION" > "$VERSION_FILE"
             resolve_tier_and_iso
+            save_version_manifest
             INTERACTIVE_SELECT=0
             ;;
     esac
@@ -813,10 +983,35 @@ else:
     print(f"{next_num}")
 PY_EOF
 )
+if [ "$ACTIVE_TIER" = "BETA" ]; then
+    BETA_BUILT=1
+    BETA_STATUS="BUILT"
+    BETA_LAST_BUILD=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    BETA_ISO="$ISO_NAME"
+    BETA_PROGRESS=100
+elif [ "$ACTIVE_TIER" = "ALPHA" ]; then
+    ALPHA_BUILT=1
+    ALPHA_STATUS="BUILT"
+    ALPHA_LAST_BUILD=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    ALPHA_ISO="$ISO_NAME"
+    ALPHA_PROGRESS=100
+elif [ "$ACTIVE_TIER" = "OMEGA" ]; then
+    OMEGA_BUILT=1
+    OMEGA_STATUS="BUILT"
+    OMEGA_LAST_BUILD=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    OMEGA_ISO="$ISO_NAME"
+    OMEGA_PROGRESS=100
+fi
+LAST_BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+LAST_BUILD_TIER="$TIER_NAME"
+LAST_BUILD_ISO="$ISO_NAME"
+LAST_BUILD_SIZE="$ISO_SIZE_HUMAN"
+LAST_BUILD_SHA256="$SHA256_HASH"
 
 if [ "${XENO_RECREATE_ISO:-0}" != "1" ] && [[ "$NEXT_VERSION" != *"Final Beta Milestone"* ]] && [[ "$NEXT_VERSION" != *"Snapshot Freeze"* ]]; then
-    echo "$NEXT_VERSION" > "$VERSION_FILE" 2>/dev/null || true
+    BUILD_VERSION="$NEXT_VERSION"
 fi
+save_version_manifest
 
 echo -e "\n${C_BOLD}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
 echo -e "${C_BOLD}                   XENO OS BUILD PIPELINE COMPLETION REPORT                    ${C_RESET}"

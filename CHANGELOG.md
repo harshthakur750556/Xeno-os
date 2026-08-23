@@ -35,8 +35,14 @@ All AI agents and developers MUST automatically append new session briefings to 
     - Exported all core configuration variables (`WS_DIR`, `ROOTFS`, `CACHE_DIR`, `META_FILE`, `VOLUME_ID`, `OUTPUT_DIR`, `TARGET_ISO`, `WIN_HOST_DIR`, `TIER_NAME`, `ISO_NAME`, `BUILD_VERSION`, `ACTUAL_USER`) and exported helper functions across subshells.
     - Switched execution engine to a direct bash pipeline (`"$@" 2>&1 | python3 -u -c ...`) with `${PIPESTATUS[0]}` exit code tracking, ensuring full native shell state and mounts are preserved while streaming live synchronized logs.
     - Implemented early `resolve_tier_and_iso` binding and refactored `render_edition_selector` layout to eliminate unbound variable crashes under `set -u` and prevent ANSI escape length distortion.
+  * **Structured Release Manifest & True Real-Progress Tracking (`iso/version.txt` & `scripts/auto-build.sh`)**:
+    - Upgraded `iso/version.txt` from a raw flat string into a structured **Version & Release Target Metadata Manifest** holding tier configurations (`BETA`, `ALPHA`, `OMEGA`), initialization states, milestone completion progress, artifact names, sizes, SHA256 checksums, and UTC build timestamps.
+    - Removed pseudo/hardcoded progress percentages from the Edition Selector. Uninitialized/unbuilt tiers (`Alpha` and `Omega`) now strictly render at `0% [░░░░░░░░░░░░░░] 0% (Uninitialized - Not Started)`, while `Beta` renders at `100% [██████████████] 100% (v10.0-beta Target Ready)`.
+    - Added automatic on-disk artifact auditing (`audit_and_sync_manifest`) and post-build manifest serialization (`save_version_manifest`).
+    - Updated `run-qemu.sh` to extract `ACTIVE_VERSION` from the structured manifest.
 - **Verification & Diagnostic Outcome**:
   * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
+  * Verified `bash -n run-qemu.sh`: 0 syntax errors.
   * Verified `bash -n scripts/xeno-reaper.sh`: 0 syntax errors.
   * Executed `bash scripts/xeno-reaper.sh health`: 0 issues found (clean exit code 0).
 

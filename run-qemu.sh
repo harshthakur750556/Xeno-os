@@ -1,6 +1,10 @@
 #!/bin/bash
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "9.0-beta")
+BUILD_VER=$(grep '^ACTIVE_VERSION=' "$WS_DIR/iso/version.txt" 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+if [ -z "$BUILD_VER" ]; then
+    BUILD_VER=$(grep -v '^#' "$WS_DIR/iso/version.txt" 2>/dev/null | head -n1 | tr -d '[:space:]')
+fi
+[ -z "$BUILD_VER" ] && BUILD_VER="10.0-beta"
 ISO_PATH=""
 CANDIDATE_PATHS=(
     "$WS_DIR/iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso"
