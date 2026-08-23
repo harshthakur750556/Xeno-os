@@ -302,87 +302,93 @@ render_stage_progress() {
     fi
 }
 
-# Live Spinner for Background Tasks with Real-Time Master Progress & Dynamic ETA
+# ── Real-Time Live Synchronized Output Streaming Engine ──────────────────────
 run_with_spinner() {
     local label="$1"
     local stage_est="${2:-15}"
     shift 2
 
-    if [ "$IS_TTY" -eq 0 ]; then
-        echo -e "  -> [Stage ${CURRENT_STAGE}/9] ${label} (target: ~${stage_est}s)..."
-        "$@"
-        local rc=$?
-        [ $rc -eq 0 ] && echo -e "  ${C_GREEN}✔ [DONE]${C_RESET} ${label}" || echo -e "  ${C_RED}✖ [FAIL]${C_RESET} ${label} (exit $rc)"
-        return $rc
-    fi
-
-    local spin_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local log_file
-    log_file=$(mktemp /tmp/xeno_build_spin_XXXXXX.log 2>/dev/null || echo "/tmp/xeno_build_spin_$$.log")
-    
-    "$@" > "$log_file" 2>&1 &
-    local pid=$!
-    local start_time
-    start_time=$(date +%s)
-    local i=0
-
+    local stage_num="$CURRENT_STAGE"
     local stage_base_secs=${STAGE_CUMULATIVE_SECS[$CURRENT_STAGE]}
+    local build_start="$BUILD_START_TIME"
+    local total_est="$TOTAL_ESTIMATED_SECS"
+    local stage_start
+    stage_start=$(date +%s)
 
-    while kill -0 "$pid" 2>/dev/null; do
-        local now
-        now=$(date +%s)
-        local step_elapsed=$(( now - start_time ))
-        local step_mins=$(( step_elapsed / 60 ))
-        local step_secs=$(( step_elapsed % 60 ))
-        
-        local total_elapsed=$(( now - BUILD_START_TIME ))
-        local total_mins=$(( total_elapsed / 60 ))
-        local total_secs=$(( total_elapsed % 60 ))
-        
-        # Calculate dynamic master progress percentage with interpolation
-        local simulated_secs=$(( stage_base_secs + (step_elapsed > stage_est ? stage_est : step_elapsed) ))
-        local master_pct=$(( simulated_secs * 100 / TOTAL_ESTIMATED_SECS ))
-        [ "$master_pct" -gt 99 ] && master_pct=99
-        [ "$master_pct" -lt 0 ] && master_pct=0
-        
-        local eta_remaining=$(( TOTAL_ESTIMATED_SECS - total_elapsed ))
-        [ "$eta_remaining" -lt 0 ] && eta_remaining=0
-        local eta_mins=$(( eta_remaining / 60 ))
-        local eta_secs=$(( eta_remaining % 60 ))
-
-        local m_bar
-        m_bar=$(render_bar "$master_pct" 100 14 "$C_CYAN")
-        
-        local max_label_len=28
-        local short_label="$label"
-        if [ ${#short_label} -gt $max_label_len ]; then
-            short_label="${short_label:0:$((max_label_len - 3))}..."
-        fi
-
-        printf "\r  ${C_CYAN}%s${C_RESET} [%b] ${C_BOLD}[%d/9]${C_RESET} %-28s ${C_DIM}[%02d:%02d/~%02ds]${C_RESET} ${C_BLUE}ETA:~%02d:%02d${C_RESET}\033[K" \
-            "${spin_chars[i]}" "$m_bar" "$CURRENT_STAGE" "$short_label" "$step_mins" "$step_secs" "$stage_est" "$eta_mins" "$eta_secs"
-        i=$(( (i + 1) % ${#spin_chars[@]} ))
-        sleep 0.1
-    done
-
-    wait "$pid"
-    local rc=$?
     local now
     now=$(date +%s)
-    local step_elapsed=$(( now - start_time ))
+    local initial_master_pct=$(( stage_base_secs * 100 / total_est ))
+    [ "$initial_master_pct" -gt 100 ] && initial_master_pct=100
+    local m_bar
+    m_bar=$(render_bar "$initial_master_pct" 100 16 "$C_CYAN")
+
+    echo -e "\n  ${C_CYAN}──▶ [Stage ${stage_num}/9]${C_RESET} ${C_BOLD}${label}${C_RESET} ${C_DIM}(target: ~${stage_est}s)${C_RESET}"
+    printf "  ${C_DIM}Master Progress: [%b] %3d%% │ Target: ~%02ds${C_RESET}\n" "$m_bar" "$initial_master_pct" "$stage_est"
+    echo -e "${C_DIM}  ─────────────────────────────────────────────────────────────────────────────${C_RESET}"
+
+    # Execute with live unbuffered output streaming and real-time synchronized timestamp/master gauges
+    python3 -u -c '
+import sys, time, subprocess, shlex
+
+stage_num = int(sys.argv[1])
+stage_est = int(sys.argv[2])
+stage_base_secs = int(sys.argv[3])
+build_start = int(sys.argv[4])
+total_est = int(sys.argv[5])
+cmd = sys.argv[6:]
+
+stage_start = time.time()
+
+C_RESET = "\033[0m"
+C_CYAN = "\033[38;2;136;192;208m"
+C_BLUE = "\033[38;2;129;161;193m"
+C_GREEN = "\033[38;2;163;190;140m"
+C_DIM = "\033[2m"
+C_BOLD = "\033[1m"
+
+quoted_cmd = " ".join(shlex.quote(c) for c in cmd)
+proc = subprocess.Popen(["bash", "-c", quoted_cmd], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+
+for line in iter(proc.stdout.readline, ""):
+    now = time.time()
+    t_elapsed = int(now - build_start)
+    s_elapsed = int(now - stage_start)
+    
+    sim_secs = stage_base_secs + min(s_elapsed, stage_est)
+    master_pct = min(99, int((sim_secs / total_est) * 100)) if total_est > 0 else 0
+    t_min, t_sec = divmod(t_elapsed, 60)
+    
+    clean_line = line.split("\r")[-1].rstrip("\n")
+    if clean_line:
+        prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{master_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
+        print(prefix + clean_line)
+        sys.stdout.flush()
+
+proc.wait()
+sys.exit(proc.returncode)
+' "$stage_num" "$stage_est" "$stage_base_secs" "$build_start" "$total_est" "$@"
+    local rc=$?
+
+    local end_time
+    end_time=$(date +%s)
+    local step_elapsed=$(( end_time - stage_start ))
     local step_mins=$(( step_elapsed / 60 ))
     local step_secs=$(( step_elapsed % 60 ))
 
+    local sim_secs=$(( stage_base_secs + (step_elapsed > stage_est ? stage_est : step_elapsed) ))
+    local end_master_pct=$(( sim_secs * 100 / TOTAL_ESTIMATED_SECS ))
+    [ "$end_master_pct" -gt 100 ] && end_master_pct=100
+    local end_m_bar
+    end_m_bar=$(render_bar "$end_master_pct" 100 16 "$C_GREEN")
+
+    echo -e "${C_DIM}  ─────────────────────────────────────────────────────────────────────────────${C_RESET}"
     if [ $rc -eq 0 ]; then
-        printf "\r  ${C_GREEN}✔ [DONE]${C_RESET} ${C_BOLD}[%d/9]${C_RESET} %-36s ${C_GREEN}[%02d:%02d] (target: ~%02ds)${C_RESET}\033[K\n" \
-            "$CURRENT_STAGE" "${label}" "$step_mins" "$step_secs" "$stage_est"
-        rm -f "$log_file"
+        printf "  ${C_GREEN}✔ [DONE]${C_RESET} ${C_BOLD}[Stage %d/9]${C_RESET} %s ${C_GREEN}[%02d:%02d / target ~%02ds]${C_RESET} │ Master: [%b] %3d%%\n\n" \
+            "$CURRENT_STAGE" "$label" "$step_mins" "$step_secs" "$stage_est" "$end_m_bar" "$end_master_pct"
         return 0
     else
-        printf "\r  ${C_RED}✖ [FAIL]${C_RESET} ${C_BOLD}[%d/9]${C_RESET} %-36s ${C_RED}[%02d:%02d] (code %d)${C_RESET}\033[K\n" \
-            "$CURRENT_STAGE" "${label}" "$step_mins" "$step_secs" "$rc"
-        tail -n 15 "$log_file" 2>/dev/null || true
-        rm -f "$log_file"
+        printf "  ${C_RED}✖ [FAIL]${C_RESET} ${C_BOLD}[Stage %d/9]${C_RESET} %s ${C_RED}[%02d:%02d] (exit code %d)${C_RESET}\n\n" \
+            "$CURRENT_STAGE" "$label" "$step_mins" "$step_secs" "$rc"
         return $rc
     fi
 }
@@ -470,6 +476,7 @@ if [ "$NEED_DOWNLOAD" = true ]; then
         fi
         return 1
     }
+    export -f download_kernel_pkgs
     run_with_spinner "Downloading kernel packages from GitHub Release" 8 download_kernel_pkgs || {
         echo -e "  ${C_YELLOW}⚠ [WARN] Failed downloading release debs. Using local cache if present.${C_RESET}"
     }
@@ -533,6 +540,7 @@ sync_desktop_env() {
     rm -f "$ROOTFS/home/xeno/.bash_history" "$ROOTFS/home/xeno/.lesshst" "$ROOTFS/home/xeno/.python_history" 2>/dev/null || true
     rm -f "$ROOTFS/root/.bash_history" "$ROOTFS/root/.lesshst" 2>/dev/null || true
 }
+export -f sync_desktop_env
 run_with_spinner "Syncing desktop shell & management scripts to RootFS" 5 sync_desktop_env
 
 if [ "${XENO_SKIP_FEATURE_SETUP:-0}" != "1" ]; then
@@ -611,7 +619,7 @@ apt-get clean
 echo "$NEW_VERSION" > /tmp/xeno-boot-kver
 EOF
 }
-
+export -f build_casper_initramfs
 run_with_spinner "Configuring Casper live initramfs, ZRAM & pruning bloat" 45 build_casper_initramfs
 
 trap - EXIT
@@ -663,6 +671,7 @@ optimize_rootfs_caches() {
     mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/tmp" "$ROOTFS/run"
     touch "$ROOTFS/proc/.keep" "$ROOTFS/sys/.keep" "$ROOTFS/dev/.keep" "$ROOTFS/tmp/.keep" "$ROOTFS/run/.keep"
 }
+export -f optimize_rootfs_caches
 run_with_spinner "Purging temporary build caches, bytecode, and CUDA runtimes" 10 optimize_rootfs_caches
 
 build_squashfs_image() {
@@ -680,6 +689,7 @@ build_squashfs_image() {
         -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
         -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
 }
+export -f build_squashfs_image
 run_with_spinner "Compressing RootFS into SquashFS (ZSTD L19, 1MB blocks)" 80 build_squashfs_image
 printf "%s\n" "$(du -sx --block-size=1 "$ROOTFS" | cut -f1)" > "$WS_DIR/iso/build/casper/filesystem.size"
 
@@ -706,6 +716,7 @@ assemble_bootloaders() {
         fi
     fi
 }
+export -f assemble_bootloaders
 run_with_spinner "Generating BIOS & UEFI boot images (BOOTX64.EFI & efi.img)" 15 assemble_bootloaders
 
 # ── STAGE 9: ISO Generation & Verification ───────────────────
@@ -717,6 +728,7 @@ generate_iso_master() {
         -volid "$VOLUME_ID" \
         -o "$LOCAL_ISO_PATH" "$WS_DIR/iso/build/"
 }
+export -f generate_iso_master
 run_with_spinner "Building bootable ISO image via xorriso-wrapper (Level 3)" 30 generate_iso_master
 
 (cd "$OUTPUT_DIR" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
@@ -731,6 +743,7 @@ if [ -d "$WIN_HOST_DIR" ]; then
         cp "$LOCAL_ISO_PATH" "$WIN_HOST_DIR/${ISO_NAME}" 2>/dev/null || true
         cp "${LOCAL_ISO_PATH}.sha256" "$WIN_HOST_DIR/${ISO_NAME}.sha256" 2>/dev/null || true
     }
+    export -f copy_win_host
     run_with_spinner "Synchronizing ISO artifact to Windows host directory" 8 copy_win_host
 fi
 
