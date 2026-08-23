@@ -100,20 +100,37 @@ WantedBy=multi-user.target
 AUTOSVC_EOF
 ln -sf /etc/systemd/system/xeno-autotune.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/xeno-autotune.service" || true
 
+# ── 2.7 Udev display and input rules ─────────────────────────
+echo "[2.7/4] Setting up DRM and input udev permissions..."
+mkdir -p "$ROOTFS/etc/udev/rules.d"
+cat > "$ROOTFS/etc/udev/rules.d/99-xeno-display.rules" << 'UDEV_EOF'
+# DRM, graphics, and input permissions for Xeno OS desktop session
+SUBSYSTEM=="drm", KERNEL=="card[0-9]*|renderD[0-9]*", GROUP="video", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="input", GROUP="input", MODE="0660", TAG+="uaccess"
+KERNEL=="uinput", GROUP="input", MODE="0660", TAG+="uaccess"
+UDEV_EOF
+
 # ── 3. Hyprland launcher ─────────────────────────────────────
 echo "[3/4] Writing updated xeno-start-hyprland..."
 cat > "$ROOTFS/usr/bin/xeno-start-hyprland" << 'LAUNCHER_EOF'
 #!/bin/bash
 # ─── Xeno OS — Hyprland Session Launcher ─────────────────────
-set -e
 
 export USER="${USER:-xeno}"
 export HOME="${HOME:-/home/xeno}"
 export LOGNAME="${LOGNAME:-xeno}"
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-if [ ! -d "$XDG_RUNTIME_DIR" ]; then
-    mkdir -p "$XDG_RUNTIME_DIR"
-    chmod 0700 "$XDG_RUNTIME_DIR"
+export XDG_SEAT="${XDG_SEAT:-seat0}"
+export XDG_VTNR="${XDG_VTNR:-1}"
+
+# Ensure runtime directory with fallback
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    if mkdir -p "/run/user/$(id -u)" 2>/dev/null; then
+        export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    else
+        export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
+        mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    fi
+    chmod 0700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 fi
 
 export XDG_SESSION_TYPE=wayland
@@ -140,10 +157,13 @@ force_software() {
     export AQ_NO_MODIFIERS=1
     export AQ_FORCE_LINEAR_BLIT=1
     export AQ_MGPU_NO_EXPLICIT=1
+    export AQ_NO_ATOMIC=1
+    export HYPRLAND_EGL_NO_MODIFIERS=1
     export HYPRLAND_NO_SD_NOTIFY=1
     export HYPRLAND_NO_RT=1
     export XCURSOR_SIZE=24
     export XCURSOR_THEME=Adwaita
+    export LIBSEAT_BACKEND="${LIBSEAT_BACKEND:-logind}"
     unset MESA_LOADER_DRIVER_OVERRIDE || true
 }
 
@@ -166,6 +186,12 @@ else
                 source /usr/bin/xeno-hardware-detect
             fi
             export WLR_NO_HARDWARE_CURSORS="${WLR_NO_HARDWARE_CURSORS:-0}"
+            export AQ_NO_MODIFIERS="${AQ_NO_MODIFIERS:-1}"
+            export AQ_FORCE_LINEAR_BLIT="${AQ_FORCE_LINEAR_BLIT:-1}"
+            export AQ_MGPU_NO_EXPLICIT="${AQ_MGPU_NO_EXPLICIT:-1}"
+            export HYPRLAND_EGL_NO_MODIFIERS="${HYPRLAND_EGL_NO_MODIFIERS:-1}"
+            export XCURSOR_SIZE=24
+            export XCURSOR_THEME=Adwaita
             ;;
     esac
 fi
@@ -178,15 +204,15 @@ fi
 
 echo "[xeno-start-hyprland] Starting Hyprland..."
 if [ -x /usr/bin/start-hyprland ]; then
-    RUN_CMD="/usr/bin/start-hyprland -- --config $HOME/.config/hypr/hyprland.conf"
+    RUN_CMD=("/usr/bin/start-hyprland" "--" "--config" "$HOME/.config/hypr/hyprland.conf")
 else
-    RUN_CMD="/usr/bin/Hyprland --config $HOME/.config/hypr/hyprland.conf"
+    RUN_CMD=("/usr/bin/Hyprland" "--config" "$HOME/.config/hypr/hyprland.conf")
 fi
 
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-    exec dbus-run-session -- $RUN_CMD
+    exec dbus-run-session -- "${RUN_CMD[@]}"
 else
-    exec $RUN_CMD
+    exec "${RUN_CMD[@]}"
 fi
 LAUNCHER_EOF
 chmod +x "$ROOTFS/usr/bin/xeno-start-hyprland"
@@ -234,9 +260,41 @@ mkdir -p "$ROOTFS/etc/skel/.config/hypr" "$ROOTFS/home/xeno/.config/hypr"
 if [ -f "$ROOTFS/home/xeno/.config/hypr/hyprland.conf" ]; then
     cp -f "$ROOTFS/home/xeno/.config/hypr/hyprland.conf" "$ROOTFS/etc/skel/.config/hypr/hyprland.conf"
 fi
-if [ -f "$ROOTFS/home/xeno/.profile" ]; then
-    cp -f "$ROOTFS/home/xeno/.profile" "$ROOTFS/etc/skel/.profile"
+
+# Configure resilient .profile autostart with interactive fallback
+cat > "$ROOTFS/etc/skel/.profile" << 'PROFILE_EOF'
+# ~/.profile: executed by the command interpreter for login shells.
+if [ -n "$BASH_VERSION" ]; then
+    if [ -f "$HOME/.bashrc" ]; then
+        . "$HOME/.bashrc"
+    fi
 fi
+
+if [ -d "$HOME/bin" ]; then
+    PATH="$HOME/bin:$PATH"
+fi
+if [ -d "$HOME/.local/bin" ]; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Auto-start Hyprland on tty1 with graceful fallback shell
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty 2>/dev/null)" = "/dev/tty1" ]; then
+    echo "Starting Xeno OS graphical session..."
+    /usr/bin/xeno-start-hyprland || {
+        EXIT_CODE=$?
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════════════"
+        echo "  ⚠ Hyprland session exited (Exit Code: $EXIT_CODE)."
+        echo "  Fallback active: TTY1 interactive recovery console."
+        echo "  Check logs: cat ~/.cache/hyprland/hyprland.log"
+        echo "  To retry:   /usr/bin/xeno-start-hyprland"
+        echo "═══════════════════════════════════════════════════════════════════════"
+        echo ""
+    }
+fi
+PROFILE_EOF
+cp -f "$ROOTFS/etc/skel/.profile" "$ROOTFS/home/xeno/.profile"
+
 if [ -d "$WS_DIR/desktop" ]; then
     mkdir -p "$ROOTFS/home/xeno/desktop" "$ROOTFS/etc/skel/desktop"
     cp -rf "$WS_DIR/desktop"/* "$ROOTFS/home/xeno/desktop/" 2>/dev/null || true
@@ -247,15 +305,33 @@ elif [ -d "$ROOTFS/home/xeno/desktop" ]; then
     cp -rf "$ROOTFS/home/xeno/desktop"/* "$ROOTFS/etc/skel/desktop/" 2>/dev/null || true
 fi
 
-# ── 3.5 Serial Console Autologin for QEMU / headless terminal ──
-echo "[3.5/4] Configuring serial console autologin on ttyS0..."
+# ── 3.5 TTY1 & Serial Console Autologin Configuration ─────────
+echo "[3.5/4] Configuring tty1 and serial console autologin..."
+mkdir -p "$ROOTFS/etc/systemd/system/getty@tty1.service.d"
+cat > "$ROOTFS/etc/systemd/system/getty@tty1.service.d/override.conf" << 'GETTY_EOF'
+[Unit]
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -- \\u' --noclear --autologin xeno %I $TERM
+Restart=always
+RestartSec=2
+GETTY_EOF
+
 mkdir -p "$ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d"
 cat > "$ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf" << 'SERIAL_EOF'
+[Unit]
+StartLimitIntervalSec=0
+
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty -o '-p -- \\u' --keep-baud 115200,38400,9600 --noclear --autologin xeno %I $TERM
+Restart=always
+RestartSec=2
 SERIAL_EOF
 mkdir -p "$ROOTFS/etc/systemd/system/getty.target.wants"
+ln -sf /usr/lib/systemd/system/getty@.service "$ROOTFS/etc/systemd/system/getty.target.wants/getty@tty1.service" 2>/dev/null || true
 ln -sf /usr/lib/systemd/system/serial-getty@.service "$ROOTFS/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service" 2>/dev/null || true
 
 # ── 4. Verify ────────────────────────────────────────────────

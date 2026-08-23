@@ -280,9 +280,13 @@ All AI agents and developers MUST automatically append new session briefings to 
     - Updated `CANDIDATE_PATHS` and default fallback `BUILD_VER` to prioritize `iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso` and `xeno_os-${BUILD_VER}-beta.iso`.
   * `README.md`:
     - Updated OS header tagline, system status badges, specifications, and project tree map to reflect `v8.0-BETA` (`8.0-beta`).
+  * `scripts/fix-boot-display.sh` & `rootfs/home/xeno/.config/hypr/hyprland.conf`:
+    - Fixed Hyprland 0.55+ configuration syntax error (`decoration:shadow:enabled` and `decoration:shadow:range`).
+    - Added `AQ_NO_ATOMIC=1` and `HYPRLAND_EGL_NO_MODIFIERS=1` to support non-atomic KMS devices and VM virtual displays.
+    - Added `99-xeno-display.rules` udev permissions for `/dev/dri/*` and `/dev/input/*`.
+    - Added `XDG_RUNTIME_DIR` fallback handling and wrapped `.profile` in a resilient interactive recovery trap preventing systemd 5-burst death loops.
   * `iso/output/` & `/mnt/c/Users/harsh/`:
-    - Purged legacy `xeno_os-7.0-alpha.iso` artifacts from WSL output tiers.
-    - Successfully built `xeno_os-8.0-beta.iso` (5.9GB, SHA256: `79e1dfc5879f4c8937996a467cffa9741d1b5cb22ba83f6da3f72390b124b28b`).
+    - Successfully built `xeno_os-8.0-beta.iso` (5.9GB, SHA256: `5c7c669cd1c4cc24b9f40310e6942bdd8ded13603d4acf1b625f56aa08ed7a5c`).
 - **Verification & Test Outcome**:
   * Automated build completed with exit code 0 (`xeno_os-8.0-beta.iso` generated and staged in `iso/output/BETA VERSION/` and `/mnt/c/Users/harsh/BETA VERSION/`).
   * Live Casper SquashFS verified at `/casper/filesystem.squashfs` with ZSTD Level 19 compression.
