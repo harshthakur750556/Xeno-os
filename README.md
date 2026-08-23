@@ -6,7 +6,7 @@
 
 # XENO OS — Next-Generation Hybrid Scientific & Security Platform
 
-> **XENO OS (v7.0-ALPHA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
+> **XENO OS (v8.0-BETA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
 
 ---
 
@@ -261,7 +261,7 @@ Xeno-os/
 ├── iso/                        # ISO build artifacts and output
 │   ├── build/casper/           # Live boot filesystem (SquashFS location)
 │   ├── output/                 # Generated ISO images (ALPHA, BETA, OMEGA)
-│   └── version.txt             # Target build version string (e.g. 7.0)
+│   └── version.txt             # Target build version string (e.g. 8.0-beta)
 ├── kernel/                     # XanMod kernel sources, patches, and build scripts
 │   ├── configs/                # xeno.config.fragment (BORE, NTSYNC, 1000Hz, WLAN)
 │   ├── patches/                # 0001 (mac80211), 0002 (cfg80211), 0003 (usb injection)
@@ -390,7 +390,41 @@ Subclassed under [`BasePanel`](file:///home/xeno/Xeno-os/desktop/panels/base_pan
 
 ---
 
-### 4. Cyber-Nord Design Tokens (Single Source of Truth)
+### 4. TypeScript Astal v2 Desktop Shell & GUI Development Workflow
+
+Xeno OS features a native TypeScript desktop shell built on **Astal v2** (GTK3) and executed on the high-performance **Bun** runtime engine:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        XENO OS TYPESCRIPT DESKTOP SHELL (BUN + ASTAL)                  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  Top Bar (Bar.ts)       → Dynamic Workspaces, Telemetry Gauges (CPU/RAM), System Clock │
+│  App Launcher (Launcher.ts) → Cyber-Nord Grid & Fuzzy Search Matrix (Super+Space)      │
+│  Notification Center (Notifications.ts) → High-Throughput Toast Dispatch Queue         │
+│  IPC & State Engine (state.ts) → Reactive State Store on /tmp/xeno-ipc.sock            │
+│  Crash-Proof Launcher (xeno-desktop-shell) → Auto-discovered & launched by Hyprland   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Developing & Previewing Custom TypeScript GUIs
+* **Live VM Preview**: Boot your ISO anytime using `bash run-qemu.sh --gui`. Hyprland boots with software cursor fallback (`no_hardware_cursors = true`) and automatically runs [`/usr/bin/xeno-desktop-shell`](file:///home/xeno/Xeno-os/rootfs/usr/bin/xeno-desktop-shell), rendering your custom TypeScript GUI instantly without crashes.
+* **Local Sandbox Preview**: Test and hot-reload your TypeScript shell without rebooting:
+  ```bash
+  # Launch the shell in local developer sandbox
+  bash desktop/shell/sandbox.sh
+  # Or run directly via Bun
+  cd desktop/shell && bun run app.ts
+  ```
+* **Zero-Crash Aquamarine Display Pipeline**:
+  - `cursor { no_hardware_cursors = true }` eliminates Aquamarine hardware DRM cursor allocation faults.
+  - `AQ_FORCE_LINEAR_BLIT=1` and `AQ_NO_MODIFIERS=1` guarantee rock-solid linear buffer rendering in VMs (QEMU, Hyper-V, VMware, VirtualBox) and bare-metal GPUs.
+  - Global TypeScript error boundaries (`uncaughtException` & `unhandledRejection`) safely catch runtime UI errors, preventing compositor drops during active GUI development.
+* **Retained Hyprland Core Desktop Elements**:
+  - Full tiling window management with key shortcuts (`Super+Return` for Kitty terminal, `Super+Space` for application launcher, `Super+Q` to close, `Super+1..5` for workspace switching, `Print` for screenshot capture).
+
+---
+
+### 5. Cyber-Nord Design Tokens (Single Source of Truth)
 
 All visual properties across both Python PySide6 panels and TypeScript Astal shell strictly adhere to central theme tokens ([`desktop/theme.py`](file:///home/xeno/Xeno-os/desktop/theme.py) and [`desktop/shell/theme.ts`](file:///home/xeno/Xeno-os/desktop/shell/theme.ts)):
 
@@ -398,16 +432,16 @@ All visual properties across both Python PySide6 panels and TypeScript Astal she
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        CYBER-NORD COLOR TOKENS                         │
 ├────────────────────────────────┬───────────────────────────────────────┤
-│ Background  (Deep Slate/Black) │ #0c0d12                               │
-│ Surface     (Deep Slate)       │ #161821                               │
-│ Surface 2   (Raised Elements)  │ #222533                               │
-│ Border      (Subtle Dividers)  │ #2f3448                               │
-│ Accent 1    (Frost Blue)       │ #88c0d0                               │
-│ Accent 2    (Neon Purple)      │ #bc13fe                               │
-│ Accent Hover(Neon Cyan)        │ #00ffff                               │
-│ Text        (Crisp Snow White) │ #eceff4                               │
-│ Text Dim    (Muted Blue-Gray)  │ #a0a8b6                               │
-│ Success / Warning / Error      │ #a3be8c / #ebcb8b / #bf616a           │
+│ Background  (Deep Slate/Black) │ #0c0d12                             │
+│ Surface     (Deep Slate)       │ #161821                             │
+│ Surface 2   (Raised Elements)  │ #222533                             │
+│ Border      (Subtle Dividers)  │ #2f3448                             │
+│ Accent 1    (Frost Blue)       │ #88c0d0                             │
+│ Accent 2    (Neon Purple)      │ #bc13fe                             │
+│ Accent Hover(Neon Cyan)        │ #00ffff                             │
+│ Text        (Crisp Snow White) │ #eceff4                             │
+│ Text Dim    (Muted Blue-Gray)  │ #a0a8b6                             │
+│ Success / Warning / Error      │ #a3be8c / #ebcb8b / #bf616a    │
 ├────────────────────────────────┼───────────────────────────────────────┤
 │ Primary Typography             │ Inter (UI, Body, Labels)              │
 │ Monospace Typography           │ JetBrains Mono (Code, Logs, Clocks)   │

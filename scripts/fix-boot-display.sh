@@ -137,10 +137,13 @@ force_software() {
     export __GLX_VENDOR_LIBRARY_NAME=mesa
     export WLR_RENDERER_ALLOW_SOFTWARE=1
     export WLR_RENDERER=gles2
-    export AQ_FORCE_SOFTWARE=1
     export AQ_NO_MODIFIERS=1
+    export AQ_FORCE_LINEAR_BLIT=1
+    export AQ_MGPU_NO_EXPLICIT=1
     export HYPRLAND_NO_SD_NOTIFY=1
     export HYPRLAND_NO_RT=1
+    export XCURSOR_SIZE=24
+    export XCURSOR_THEME=Adwaita
     unset MESA_LOADER_DRIVER_OVERRIDE || true
 }
 
@@ -174,9 +177,10 @@ if [ ! -f "$HOME/.config/hypr/hyprland.conf" ] && [ -f /etc/skel/.config/hypr/hy
 fi
 
 echo "[xeno-start-hyprland] Starting Hyprland..."
-RUN_CMD="/usr/bin/Hyprland --config $HOME/.config/hypr/hyprland.conf"
 if [ -x /usr/bin/start-hyprland ]; then
-    RUN_CMD="/usr/bin/start-hyprland --config $HOME/.config/hypr/hyprland.conf"
+    RUN_CMD="/usr/bin/start-hyprland -- --config $HOME/.config/hypr/hyprland.conf"
+else
+    RUN_CMD="/usr/bin/Hyprland --config $HOME/.config/hypr/hyprland.conf"
 fi
 
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
@@ -187,6 +191,44 @@ fi
 LAUNCHER_EOF
 chmod +x "$ROOTFS/usr/bin/xeno-start-hyprland"
 
+# ── 3.2 Desktop Shell Launcher (TypeScript Astal v2) ─────────
+echo "[3.2/4] Writing xeno-desktop-shell launcher..."
+cat > "$ROOTFS/usr/bin/xeno-desktop-shell" << 'SHELL_EOF'
+#!/bin/bash
+# ─── Xeno OS — TypeScript Astal Desktop Shell Launcher ───────
+set -e
+
+# Find shell directory
+SHELL_DIR=""
+for candidate in "$HOME/desktop/shell" "/home/xeno/desktop/shell" "/usr/share/xeno/shell"; do
+    if [ -f "$candidate/app.ts" ]; then
+        SHELL_DIR="$candidate"
+        break
+    fi
+done
+
+if [ -z "$SHELL_DIR" ]; then
+    echo "[xeno-desktop-shell] No TypeScript shell found at $HOME/desktop/shell."
+    exit 0
+fi
+
+# Ensure bun is in PATH
+export PATH="/usr/local/bin:$HOME/.bun/bin:$PATH"
+
+if command -v bun >/dev/null 2>&1; then
+    echo "[xeno-desktop-shell] Starting Astal v2 TypeScript Shell from $SHELL_DIR..."
+    cd "$SHELL_DIR"
+    exec bun run app.ts
+elif command -v astal >/dev/null 2>&1; then
+    echo "[xeno-desktop-shell] Starting Astal Desktop Shell via astal CLI..."
+    cd "$SHELL_DIR"
+    exec astal -d "$SHELL_DIR"
+else
+    echo "[xeno-desktop-shell] Neither Bun nor Astal CLI found. Running in Hyprland default mode."
+fi
+SHELL_EOF
+chmod +x "$ROOTFS/usr/bin/xeno-desktop-shell"
+
 # ── 3.4 Sync live user skeleton configs ───────────────────────
 mkdir -p "$ROOTFS/etc/skel/.config/hypr" "$ROOTFS/home/xeno/.config/hypr"
 if [ -f "$ROOTFS/home/xeno/.config/hypr/hyprland.conf" ]; then
@@ -195,7 +237,12 @@ fi
 if [ -f "$ROOTFS/home/xeno/.profile" ]; then
     cp -f "$ROOTFS/home/xeno/.profile" "$ROOTFS/etc/skel/.profile"
 fi
-if [ -d "$ROOTFS/home/xeno/desktop" ]; then
+if [ -d "$WS_DIR/desktop" ]; then
+    mkdir -p "$ROOTFS/home/xeno/desktop" "$ROOTFS/etc/skel/desktop"
+    cp -rf "$WS_DIR/desktop"/* "$ROOTFS/home/xeno/desktop/" 2>/dev/null || true
+    cp -rf "$WS_DIR/desktop"/* "$ROOTFS/etc/skel/desktop/" 2>/dev/null || true
+    chown -R 1000:1000 "$ROOTFS/home/xeno/desktop" 2>/dev/null || true
+elif [ -d "$ROOTFS/home/xeno/desktop" ]; then
     mkdir -p "$ROOTFS/etc/skel/desktop"
     cp -rf "$ROOTFS/home/xeno/desktop"/* "$ROOTFS/etc/skel/desktop/" 2>/dev/null || true
 fi
@@ -215,6 +262,7 @@ ln -sf /usr/lib/systemd/system/serial-getty@.service "$ROOTFS/etc/systemd/system
 echo "[4/4] Verifying..."
 echo "  display-manager.service: $(ls "$ROOTFS/etc/systemd/system/display-manager.service" 2>/dev/null || echo 'REMOVED ✓')"
 echo "  xeno-start-hyprland:     $(ls -la "$ROOTFS/usr/bin/xeno-start-hyprland" | awk '{print $1, $5, $9}')"
+echo "  xeno-desktop-shell:      $(ls -la "$ROOTFS/usr/bin/xeno-desktop-shell" | awk '{print $1, $5, $9}')"
 echo "  limits:                  $ROOTFS/etc/security/limits.d/99-hyprland.conf"
 echo "  serial-getty@ttyS0:      $ROOTFS/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf"
 echo ""

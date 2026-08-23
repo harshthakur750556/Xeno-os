@@ -1,14 +1,20 @@
 #!/bin/bash
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "7.0")
+BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "8.0-beta")
 ISO_PATH=""
 CANDIDATE_PATHS=(
-    "$WS_DIR/iso/output/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
     "$WS_DIR/iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso"
-    "$WS_DIR/iso/output/xeno_os-${BUILD_VER}-alpha.iso"
+    "$WS_DIR/iso/output/BETA VERSION/xeno_os-${BUILD_VER}-beta.iso"
+    "$WS_DIR/iso/output/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
+    "$WS_DIR/iso/output/ALPHA VERSION/xeno_os-${BUILD_VER}.iso"
     "$WS_DIR/iso/output/xeno_os-${BUILD_VER}.iso"
-    "/mnt/c/Users/harsh/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
+    "$WS_DIR/iso/output/xeno_os-${BUILD_VER}-beta.iso"
+    "$WS_DIR/iso/output/xeno_os-${BUILD_VER}-alpha.iso"
     "/mnt/c/Users/harsh/BETA VERSION/xeno_os-${BUILD_VER}.iso"
+    "/mnt/c/Users/harsh/BETA VERSION/xeno_os-${BUILD_VER}-beta.iso"
+    "/mnt/c/Users/harsh/ALPHA VERSION/xeno_os-${BUILD_VER}-alpha.iso"
+    "/mnt/c/Users/harsh/xeno_os-${BUILD_VER}.iso"
+    "/mnt/c/Users/harsh/xeno_os-${BUILD_VER}-beta.iso"
     "/mnt/c/Users/harsh/xeno_os-${BUILD_VER}-alpha.iso"
 )
 

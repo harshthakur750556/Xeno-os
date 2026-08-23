@@ -29,11 +29,11 @@ mkdir -p "$OUTPUT_DIR" "$WS_DIR/iso/output/BETA VERSION"
 TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
 WIN_HOST_DIR="/mnt/c/Users/harsh"
 
-# Clean up all older ISO and SHA256 versions across WSL & Windows host within the tier
-find "$OUTPUT_DIR" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
+# Clean up all older ISO and SHA256 versions across WSL & Windows host across all tiers
+find "$WS_DIR/iso/output" -maxdepth 2 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
 if [ -d "$WIN_HOST_DIR" ]; then
     mkdir -p "$WIN_HOST_DIR/$TIER_NAME" "$WIN_HOST_DIR/BETA VERSION" 2>/dev/null || true
-    find "$WIN_HOST_DIR/$TIER_NAME" -maxdepth 1 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
+    find "$WIN_HOST_DIR" -maxdepth 2 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true
 fi
 ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"

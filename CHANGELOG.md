@@ -235,6 +235,58 @@ All AI agents and developers MUST automatically append new session briefings to 
   * Ran `python3 -m unittest tests/test_adversarial.py`: 23/23 Adversarial IPC boundary tests passed with 0 errors and 0 failures (Total: 96/96 tests passing).
   * Ran `bash scripts/master-doctor.sh`: 45 checks passed with 0 failures across all 8 tiers, verifying OPTIMAL system status.
 
+---
+
+### August 23, 2026 - Session 16 Briefing
+- **Primary Objective**: 
+  * Permanently resolve Hyprland startup crash (`Creating the AsyncResourceGatherer!` failure / `start-hyprland` launch warning).
+  * Eliminate Aquamarine backend DRM cursor allocation SIGABRT on hardware/VM displays.
+  * Correct `start-hyprland` argument forwarding syntax in compositor launcher scripts.
+  * Enable seamless TypeScript Astal v2 GUI development, hot-reloading, and zero-crash live OS previewing while decoupling from the legacy PySide6 autostart.
+- **Root Cause Analysis**:
+  * **Launcher Warning (`WARNING: Hyprland is being launched without start-hyprland`)**: `/usr/bin/xeno-start-hyprland` passed `--config` directly to `start-hyprland` instead of forwarding flags after `--`. In Hyprland 0.55+, `start-hyprland` only accepts its internal options before `--` and compositor options after `--`.
+  * **Compositor Crash (`AsyncResourceGatherer` -> Aquamarine DRM/Cursor crash)**: Hyprland 0.42+ transitioned from `wlroots` to `Aquamarine`. Aquamarine ignores the legacy `WLR_NO_HARDWARE_CURSORS=1` variable and attempts to allocate hardware DRM cursor planes, triggering fatal buffer sync / SIGABRT crashes when running under software rendering (`llvmpipe`), VM graphics (virtio/bochs), or GPUs lacking hardware cursor support.
+- **Changes Made**:
+  * `rootfs/home/xeno/.config/hypr/hyprland.conf` & `rootfs/etc/skel/.config/hypr/hyprland.conf`: 
+    - Added explicit `cursor { no_hardware_cursors = true; enable_hyprcursor = false; warp_on_change_workspace = true }` configuration block.
+    - Configured Aquamarine fallback variables (`AQ_NO_MODIFIERS=1`, `AQ_FORCE_LINEAR_BLIT=1`, `AQ_MGPU_NO_EXPLICIT=1`, `XCURSOR_THEME=Adwaita`, `XCURSOR_SIZE=24`).
+    - Replaced legacy PySide6 panel autostart (`python3 /home/xeno/desktop/app.py`) with native TypeScript desktop shell launcher (`/usr/bin/xeno-desktop-shell`), while keeping all default Hyprland window tiling, wallpaper, and keybindings intact.
+  * `scripts/fix-boot-display.sh` & `rootfs/usr/bin/xeno-start-hyprland`: 
+    - Updated `force_software()` to export Aquamarine buffer sync parameters and corrected `start-hyprland` execution syntax to `/usr/bin/start-hyprland -- --config "$HOME/.config/hypr/hyprland.conf"`.
+    - Generated `/usr/bin/xeno-desktop-shell` with dynamic directory discovery (`$HOME/desktop/shell`), PATH handling, and fallback execution.
+    - Enhanced skeleton sync to mirror workspace `desktop/` changes to rootfs.
+  * `README.md`: Added Section 4 on TypeScript Astal v2 Desktop Shell & GUI Development Workflow (live previewing via `run-qemu.sh --gui`, local sandbox testing via `desktop/shell/sandbox.sh`, error boundary protection, and retained Hyprland keybindings).
+- **Verification & Test Outcome**:
+  * Ran `sudo bash scripts/fix-boot-display.sh`: Successfully synced `/etc/skel`, created `/usr/bin/xeno-desktop-shell`, and regenerated `/usr/bin/xeno-start-hyprland`.
+  * Ran `python3 tests/run_tests.py`: 73/73 E2E Integration tests passed with 0 errors and 0 failures.
+  * Ran `python3 -m unittest tests/test_adversarial.py`: 23/23 Adversarial IPC boundary tests passed with 0 errors and 0 failures.
+  * Ran `sudo bash scripts/master-doctor.sh`: Tier 2 (Security/PAM/Hyprland launcher), Tier 7 (All 96 automated tests), and Tier 8 (Casper/ISO integrity) all verified PASS.
+
+---
+
+### August 23, 2026 - Session 17 Briefing
+- **Primary Objective**:
+  * Formalize release version naming to **v8.0-BETA** across all build pipelines, documentation, test suites, and launch runners.
+  * Re-route the build artifact pipeline to strictly store the generated ISO inside the `iso/output/BETA VERSION/` directory tier (`xeno_os-8.0-beta.iso`).
+  * Purge legacy v7 ISO artifacts (`xeno_os-7.0-alpha.iso*`) from WSL build output trees and the Windows host mirror (`/mnt/c/Users/harsh/`).
+  * Synchronize all technical parameters, documentation, system badges, and tree maps across `README.md`, `iso/version.txt`, `run-qemu.sh`, and `scripts/auto-build.sh`.
+  * Execute the full Smart Lean packaging pipeline to build and verify `xeno_os-8.0-beta.iso` with multi-core ZSTD Level 19 SquashFS compression and ISO Level 3 GRUB mastering.
+- **Changes Made**:
+  * `iso/version.txt`: Bumped version target from `7.0` to `8.0-beta`.
+  * `scripts/auto-build.sh`:
+    - Updated auto-cleanup depth (`maxdepth 2`) to comprehensively purge legacy versions across all tier directories (`iso/output/` and `/mnt/c/Users/harsh/`).
+    - Configured automatic routing to `iso/output/BETA VERSION/xeno_os-8.0-beta.iso` with SHA256 checksum generation and host mirroring to `/mnt/c/Users/harsh/BETA VERSION/xeno_os-8.0-beta.iso`.
+  * `run-qemu.sh`:
+    - Updated `CANDIDATE_PATHS` and default fallback `BUILD_VER` to prioritize `iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso` and `xeno_os-${BUILD_VER}-beta.iso`.
+  * `README.md`:
+    - Updated OS header tagline, system status badges, specifications, and project tree map to reflect `v8.0-BETA` (`8.0-beta`).
+  * `iso/output/` & `/mnt/c/Users/harsh/`:
+    - Purged legacy `xeno_os-7.0-alpha.iso` artifacts from WSL output tiers.
+    - Successfully built `xeno_os-8.0-beta.iso` (5.9GB, SHA256: `79e1dfc5879f4c8937996a467cffa9741d1b5cb22ba83f6da3f72390b124b28b`).
+- **Verification & Test Outcome**:
+  * Automated build completed with exit code 0 (`xeno_os-8.0-beta.iso` generated and staged in `iso/output/BETA VERSION/` and `/mnt/c/Users/harsh/BETA VERSION/`).
+  * Live Casper SquashFS verified at `/casper/filesystem.squashfs` with ZSTD Level 19 compression.
+  * Master Doctor Tier 1-8 verified with all 96 tests (73 E2E Integration + 23 Adversarial IPC tests) passing.
 
 
 
