@@ -1,0 +1,15 @@
+<svg width="100%" height="8" viewBox="0 0 900 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="divLaser" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.1"/>
+      <stop offset="30%" stop-color="#00F0FF" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#bc13fe" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#00FFA3" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0.1"/>
+      <animate attributeName="x1" values="-100%; 100%" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="0%; 200%" dur="4s" repeatCount="indefinite"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="2.5" width="900" height="3" rx="1.5" fill="#1e2230"/>
+  <rect x="0" y="2" width="900" height="4" rx="2" fill="url(#divLaser)"/>
+</svg>
