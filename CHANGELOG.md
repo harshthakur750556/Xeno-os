@@ -30,9 +30,10 @@ All AI agents and developers MUST automatically append new session briefings to 
   * **CLI & Menu Integration**:
     - Added `--select` / `--interactive` flag to `scripts/auto-build.sh`.
     - Enhanced Menu Option `[15]` in `scripts/xeno-reaper.sh` to prompt for immediate build, opening the designer matrix selector, or freezing snapshot recreation.
-  * **Transparent Live System Streaming Output (`scripts/auto-build.sh`)**:
-    - Replaced silent background log file redirection with a transparent execution engine streaming all system messages, apt-get outputs, kernel installation logs, `update-initramfs` hooks, `mksquashfs` progress percentages, and `grub-mkrescue`/`xorriso` sector writes directly to the user's terminal in real-time.
-    - Preserved Cyber-Nord Stage/Step entry banners, live timing metrics, and the Master Progress Bar completion badges while eliminating output suppression.
+  * **Transparent Live System Streaming Output & Environment Preservation (`scripts/auto-build.sh`)**:
+    - Resolved subshell environment disconnection where helper functions (`build_casper_initramfs`, `mksquashfs`, etc.) lost access to `$ROOTFS` and `$WS_DIR`.
+    - Exported all core configuration variables (`WS_DIR`, `ROOTFS`, `CACHE_DIR`, `META_FILE`, `VOLUME_ID`, `OUTPUT_DIR`, `TARGET_ISO`, `WIN_HOST_DIR`, `TIER_NAME`, `ISO_NAME`, `BUILD_VERSION`, `ACTUAL_USER`) and exported helper functions across subshells.
+    - Switched execution engine to a direct bash pipeline (`"$@" 2>&1 | python3 -u -c ...`) with `${PIPESTATUS[0]}` exit code tracking, ensuring full native shell state and mounts are preserved while streaming live synchronized logs.
 - **Verification & Diagnostic Outcome**:
   * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
   * Verified `bash -n scripts/xeno-reaper.sh`: 0 syntax errors.

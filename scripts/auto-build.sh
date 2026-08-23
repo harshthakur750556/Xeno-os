@@ -57,9 +57,9 @@ render_edition_selector() {
     clear
     echo -e "${C_CYAN}${C_BOLD}"
     cat << 'SELECTOR_BANNER_EOF'
- ░█▀▀▀ ░█▀▀▄ ░█ ▀▀█▀▀ ░█ ░█▀▀█ ░█▄─░█   ░█▀▄▀█ ─█▀▀█ ▀▀█▀▀ ░█▀▀█ ░█ ░█ ░█ ░█ 
+ ░█▀▀▀ ░█▀▀▄ ░█ ▀▀█▀▀ ░█ ░█▀▀█ ░█▄─░█   ░█▀▄▀█ ─█▀▀█ ▀▀█▀▀ ░█▀▀█ ░█ ░█──░█ 
  ░█▀▀▀ ░█─░█ ░█ ─░█── ░█ ░█──█ ░█░█░█   ░█░█░█ ░█▄▄█ ─░█── ░█▄▄▀ ░█ ─░█░█─ 
- ░█▄▄▄ ░█▄▄▀ ░█ ─░█── ░█ ░█▄▄█ ░█──▀█   ░█──░█ ░█──█ ─░█── ░█─░█ ░█ ──░█── 
+ ░█▄▄▄ ░█▄▄▀ ░█ ─░█── ░█ ░█▄▄█ ░█──▀█   ░█──░█ ░█──█ ─░█── ░█─░█ ░█ ░█──░█ 
 SELECTOR_BANNER_EOF
     echo -e "${C_BLUE} ═══ XENO OS EDITION & RELEASE TARGET MATRIX ═══${C_RESET}\n"
 
@@ -154,30 +154,38 @@ SELECTOR_BANNER_EOF
 }
 
 # ── Argument Handling & Tier Configuration ──────────────────────────────────
-INTERACTIVE_SELECT=0
+INTERACTIVE_SELECT=1
 for arg in "${@:-}"; do
     case "$arg" in
         --select|--interactive|-i)
             INTERACTIVE_SELECT=1
             ;;
+        --batch|--non-interactive|-y|--yes)
+            INTERACTIVE_SELECT=0
+            ;;
         --beta|--tier-beta)
-            BUILD_VERSION="9.0-beta"
+            BUILD_VERSION="10.0-beta"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            INTERACTIVE_SELECT=0
             ;;
         --alpha|--tier-alpha)
             BUILD_VERSION="1.0-alpha"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            INTERACTIVE_SELECT=0
             ;;
         --omega|--tier-omega)
             BUILD_VERSION="1.0-omega"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            INTERACTIVE_SELECT=0
             ;;
         --recreate|--rebuild|--recreate-beta)
             export XENO_RECREATE_ISO=1
+            INTERACTIVE_SELECT=0
             ;;
         --version=*|--ver=*)
             BUILD_VERSION="${arg#*=}"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            INTERACTIVE_SELECT=0
             ;;
     esac
 done
@@ -212,6 +220,10 @@ ROOTFS="$WS_DIR/rootfs"
 CACHE_DIR="$WS_DIR/kernel/cache"
 META_FILE="$CACHE_DIR/latest_release.json"
 VOLUME_ID="XENOOS"
+
+export WS_DIR ROOTFS CACHE_DIR META_FILE VOLUME_ID OUTPUT_DIR TARGET_ISO WIN_HOST_DIR TIER_NAME ISO_NAME BUILD_VERSION
+ACTUAL_USER="${SUDO_USER:-xeno}"
+export ACTUAL_USER
 
 # ── Pipeline Time Profiling & Master Progress Configuration ────────────────
 TOTAL_ESTIMATED_SECS=250
@@ -326,16 +338,16 @@ run_with_spinner() {
     printf "  ${C_DIM}Master Progress: [%b] %3d%% │ Target: ~%02ds${C_RESET}\n" "$m_bar" "$initial_master_pct" "$stage_est"
     echo -e "${C_DIM}  ─────────────────────────────────────────────────────────────────────────────${C_RESET}"
 
-    # Execute with live unbuffered output streaming and real-time synchronized timestamp/master gauges
-    python3 -u -c '
-import sys, time, subprocess, shlex
+    # Execute directly in bash environment, piping stdout/stderr into Python unbuffered real-time sync streamer
+    local rc=0
+    "$@" 2>&1 | python3 -u -c '
+import sys, time
 
 stage_num = int(sys.argv[1])
 stage_est = int(sys.argv[2])
 stage_base_secs = int(sys.argv[3])
 build_start = int(sys.argv[4])
 total_est = int(sys.argv[5])
-cmd = sys.argv[6:]
 
 stage_start = time.time()
 
@@ -346,10 +358,7 @@ C_GREEN = "\033[38;2;163;190;140m"
 C_DIM = "\033[2m"
 C_BOLD = "\033[1m"
 
-quoted_cmd = " ".join(shlex.quote(c) for c in cmd)
-proc = subprocess.Popen(["bash", "-c", quoted_cmd], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
-
-for line in iter(proc.stdout.readline, ""):
+for line in iter(sys.stdin.readline, ""):
     now = time.time()
     t_elapsed = int(now - build_start)
     s_elapsed = int(now - stage_start)
@@ -363,11 +372,7 @@ for line in iter(proc.stdout.readline, ""):
         prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{master_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
         print(prefix + clean_line)
         sys.stdout.flush()
-
-proc.wait()
-sys.exit(proc.returncode)
-' "$stage_num" "$stage_est" "$stage_base_secs" "$build_start" "$total_est" "$@"
-    local rc=$?
+' "$stage_num" "$stage_est" "$stage_base_secs" "$build_start" "$total_est" || rc=${PIPESTATUS[0]}
 
     local end_time
     end_time=$(date +%s)
