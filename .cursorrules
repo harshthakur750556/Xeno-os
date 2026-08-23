@@ -49,7 +49,7 @@ Every model processing this workspace must strictly adhere to the following exec
 | **Live Boot Stack** | Ubuntu native Casper stack (`boot=casper`). Debian live-boot is forbidden. |
 | **Display Server** | Wayland via Hyprland compositor. Software fallback via `llvmpipe` inside VMs. |
 | **Windows Compat** | Flatpak-isolated Bottles runner with Wine Staging, DXVK, VKD3D-Proton, `xeno-windows`. |
-| **Shell & GUI** | TypeScript Astal v2 (Bun runtime) for shell; PySide6 for scientific desktop panels. |
+| **Shell & GUI** | 100% Native TypeScript Astal v2 (Bun runtime) for desktop shell & native apps. |
 | **Kernel Source** | XanMod Linux 6.12+ (BORE EEVDF scheduler + Kali `mac80211` frame injection patches). |
 
 ---
@@ -59,17 +59,12 @@ Every model processing this workspace must strictly adhere to the following exec
 ```
 Xeno-os/
 ├── .github/workflows/         # GitHub Actions kernel CI pipeline (build-kernel.yml)
-├── desktop/                  # PySide6 scientific panels + TypeScript Astal shell + theme tokens
+├── desktop/                  # TypeScript Astal shell, theme tokens, and assets
 │   ├── env.py                # Virtual machine software graphics fallback guard
-│   ├── theme.py              # Central Python visual theme tokens (Single Source of Truth)
-│   ├── app.py                # Main desktop application entry point
-│   ├── workspace.py          # Multi-panel scientific workspace host
-│   ├── filemanager.py        # Cyber-Nord file explorer with root guardrails
-│   ├── loginscreen.py        # Session display lock/login manager
-│   ├── settings.py           # Desktop preferences & theme customizer
-│   ├── avatar_controller.py  # Interactive desktop assistant interface
-│   ├── shell/                # Astal v2 / Bun TypeScript desktop shell (Bar, Launcher, Notifications)
-│   └── panels/               # Scientific panels (BasePanel, Math, Data, Code, 3D, Signal)
+│   ├── theme.py              # Central Python visual theme tokens (reference)
+│   ├── assets/               # Desktop visual icons and SVG assets
+│   ├── themes/               # Supplemental theme presets and palettes
+│   └── shell/                # Astal v2 / Bun TypeScript desktop shell (Bar, Launcher, Notifications)
 ├── drivers/                  # Hardware & wireless driver scripts (README.md, install-oot-wifi.sh)
 ├── iso/                      # ISO build directory (build/casper/, output/ALPHA, output/BETA, version.txt)
 ├── kernel/                   # XanMod patches (0001, 0002, 0003), configs, cache/, build-kernel.sh, validate-kernel-deb.sh
@@ -113,7 +108,7 @@ Xeno-os/
   Debian live-boot conflicts with Ubuntu casper stack at boot. The rootfs must have casper installed and live-boot purged. The SquashFS must be at `iso/build/casper/filesystem.squashfs` with `boot=casper`.
 
 * **[RESO_04] VM GRAPHICS FALLBACK**
-  Hyper-V, VirtualBox, and QEMU without Vulkan fail on standard Wayland. The `/usr/bin/xeno-start-hyprland` script detects virtual environments using `systemd-detect-virt` and enables software rendering (`WLR_RENDERER=pixman`, `LIBGL_ALWAYS_SOFTWARE=1`, `GALLIUM_DRIVER=llvmpipe`, `MESA_LOADER_DRIVER_OVERRIDE=softpipe`).
+  Hyper-V, VirtualBox, and QEMU without Vulkan fail on standard Wayland. The `/usr/bin/xeno-start-hyprland` script detects virtual environments and enables software rendering (`MESA_LOADER_DRIVER_OVERRIDE=kms_swrast`, `LIBGL_ALWAYS_SOFTWARE=1`, `GALLIUM_DRIVER=llvmpipe`).
 
 * **[RESO_05] ISO LEVEL 3 FOR OVERSIZED IMAGES**
   The rootfs exceeds 4GB. All `xorriso` invocations must specify `-iso-level 3`. GRUB volume ID must be $\le 8$ uppercase alphanumeric characters (`XENOOS`).
@@ -129,14 +124,14 @@ Xeno-os/
 
 ## 5. MANDATORY ARCHITECTURAL GUARDRAILS
 
-### Guardrail A: Scientific Panel Thread Isolation
-Heavy math/data processing runs inside a dedicated `QObject` worker attached to a `QThread`. Worker communicates with UI strictly via `Qt.QueuedConnection` signals. Never access UI elements directly from worker threads.
+### Guardrail A: Astal v2 TypeScript Lifecycle & Error Boundaries
+The desktop shell runs on the Bun engine. All UI event dispatching must be wrapped in global `uncaughtException` and `unhandledRejection` error boundaries to prevent unhandled UI errors from terminating the Wayland session.
 
-### Guardrail B: Deferred VTK Viewport Loading
-To prevent X11 `BadWindow` crashes on startup when placed inside a `QStackedWidget`, `threed_panel.py` must defer VTK interactor initialization until the panel becomes active (`_lazy_init_vtk()`).
+### Guardrail B: Software Rasterizer KMS Dumb Buffers
+When running inside hypervisors or software graphics mode, OpenGL rendering must map to KMS dumb buffers via `MESA_LOADER_DRIVER_OVERRIDE=kms_swrast` alongside `AQ_NO_MODIFIERS=1` and `AQ_FORCE_LINEAR_BLIT=1`.
 
-### Guardrail C: Matplotlib Backend Guard
-Every panel using Matplotlib must execute `matplotlib.use('Agg')` prior to importing any other Matplotlib submodules.
+### Guardrail C: Single Source of Truth for Visual Design
+All visual tokens belong strictly to `desktop/shell/theme.ts`. Never write inline hex values or hardcoded dimensions.
 
 ### Guardrail D: Scoped Realtime Security Permissions
 Realtime permissions in `/etc/security/limits.d/99-hyprland.conf` are strictly scoped to `@hyprland` and `xeno` groups with `rtprio 99` and `memlock unlimited`. Global wildcards (`*`) are prohibited.

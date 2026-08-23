@@ -4,7 +4,7 @@ import sys
 
 def init_qt_environment():
     """
-    Ensure PySide6 / Qt / WebEngine / Matplotlib / VTK apps run reliably
+    Ensure graphical and rendering tools run reliably
     without blank screens in Virtual Machines (QEMU/KVM/VirtualBox) or standalone terminals.
     """
     # 1. Detect if running in VM or if software rendering is requested

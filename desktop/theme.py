@@ -1,7 +1,6 @@
 """
-XENO OS THEME — SINGLE SOURCE OF TRUTH (Python / PySide6 side)
-All visual values below are defined here. No panel file may
-redefine, duplicate, or override these — import `theme` instead.
+XENO OS THEME — DESIGN SYSTEM VISUAL TOKENS
+All visual values below are defined here. Reference theme tokens from this file.
 """
 
 class XenoTheme:
