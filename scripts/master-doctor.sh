@@ -11,6 +11,7 @@
 
 set -uo pipefail
 
+export PATH="/usr/local/bin:/usr/bin:/bin:$HOME/.bun/bin:/home/xeno/.bun/bin:${PATH:-}"
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOTFS="${XENO_ROOTFS:-$WS_DIR/rootfs}"
 AUTO_FIX=0

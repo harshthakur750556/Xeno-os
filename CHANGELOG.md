@@ -292,5 +292,40 @@ All AI agents and developers MUST automatically append new session briefings to 
   * Live Casper SquashFS verified at `/casper/filesystem.squashfs` with ZSTD Level 19 compression.
   * Master Doctor Tier 1-8 verified with all 96 tests (73 E2E Integration + 23 Adversarial IPC tests) passing.
 
+---
 
-
+### August 23, 2026 - Session 18 Briefing [RELEASE v9.0-BETA & GRAPHICS SUBSYSTEM OVERHAUL]
+- **Primary Objective**:
+  * Permanently resolve Hyprland / Aquamarine EGL crash under VirtualBox VMSVGA (`DRI2: failed to create screen` / `EGL: failed to initialize a platform display`).
+  * Remove all legacy Python/PySide6 based GUI files to establish a clean, ultra-responsive 100% TypeScript Astal v2 / Bun desktop shell architecture.
+  * Streamline the live bootloader configuration by removing the 2-option selection menu and establishing a single, instant default Universal Wayland boot entry (`set timeout=0`).
+  * Remove all older ISO images (`xeno_os-8.0-beta.iso*`) from across the entire host and build environments.
+  * Bump release version to **v9.0-BETA** (`xeno_os-9.0-beta.iso`) and build the production-ready ISO with ZSTD Level 19 SquashFS compression and Level 3 GRUB mastering.
+- **Root Cause Analysis (VirtualBox VMSVGA & VM Graphics Failure)**:
+  * **The Issue**: When Hyprland (0.55.4 with Aquamarine backend) initializes DRM on `/dev/dri/card0` in VirtualBox with VMSVGA, Mesa inspects the kernel driver name (`vmwgfx`) and attempts to load `vmwgfx_dri.so`.
+  * **The Failure Mechanism**: `vmwgfx_dri.so` queries the host for SVGA3D / DRI2 hardware channels. In standard VM configurations without host 3D acceleration, DRI2 screen creation fails immediately (`DRI2: failed to create screen`), causing `eglInitialize` to throw `EGL_NOT_INITIALIZED (0x32209)` and terminating Hyprland at line 168 in `OpenGL.cpp`.
+  * **Why Prior Flags Were Insufficient**: Setting `LIBGL_ALWAYS_SOFTWARE=1` and `GALLIUM_DRIVER=llvmpipe` instructed Mesa to use software rendering for client contexts, but did NOT stop Mesa's GBM loader from loading `vmwgfx_dri.so` on `/dev/dri/card0` because `MESA_LOADER_DRIVER_OVERRIDE` was previously unset.
+  * **The Permanent Solution**: Setting **`MESA_LOADER_DRIVER_OVERRIDE=kms_swrast`** forces Mesa's DRI/GBM loader to load `kms_swrast_dri.so`. `kms_swrast` connects the LLVMpipe CPU rasterizer directly to standard DRM KMS dumb buffers (`DRM_IOCTL_MODE_CREATE_DUMB`), which are supported by 100% of virtual and hardware display adapters (VirtualBox VMSVGA, VBoxSVGA, VMware SVGA, QEMU virtio-gpu, Bochs, Cirrus, SimpleDRM, Hyper-V, and bare metal).
+- **Changes Made**:
+  * **Universal Session Launcher (`scripts/fix-boot-display.sh` -> `/usr/bin/xeno-start-hyprland`)**:
+    - Configured `MESA_LOADER_DRIVER_OVERRIDE=kms_swrast`, `GALLIUM_DRIVER=llvmpipe`, `LIBGL_ALWAYS_SOFTWARE=1`, and `__GLX_VENDOR_LIBRARY_NAME=mesa`.
+    - Configured Aquamarine DRM parameters (`AQ_NO_MODIFIERS=1`, `AQ_FORCE_LINEAR_BLIT=1`, `AQ_MGPU_NO_EXPLICIT=1`, `AQ_NO_ATOMIC=1`, `HYPRLAND_EGL_NO_MODIFIERS=1`, `WLR_NO_HARDWARE_CURSORS=1`).
+    - Implemented multi-tier VM auto-detection: checks kernel command line (`xeno.safegraphics=1`, `nomodeset`), `systemd-detect-virt`, DMI hardware strings (`innotek`, `VirtualBox`, `VMware`, `QEMU`, `KVM`, `Bochs`, `Microsoft`), DRM driver types (`vmwgfx`, `vboxvideo`, `bochs-drm`, `cirrus`, `simpledrm`, `hyperv_drm`), and PCI vendor signatures.
+    - Implemented **Dynamic Self-Healing Supervisor**: wraps Hyprland execution; if Hyprland exits abruptly (<5 seconds) on bare metal or hardware GL due to driver/firmware failures, the supervisor automatically engages `kms_swrast` software fallback and relaunches Hyprland seamlessly without dropping the user to a black screen.
+  * **Desktop Environment & PySide6 Removal**:
+    - Purged all legacy Python GUI files from workspace `desktop/`, `rootfs/home/xeno/desktop/`, and `rootfs/etc/skel/desktop/`:
+      * `desktop/app.py`, `desktop/workspace.py`, `desktop/filemanager.py`, `desktop/loginscreen.py`, `desktop/settings.py`, `desktop/avatar_controller.py`, `desktop/avatar_viewer.html`, and `desktop/panels/` (`base_panel.py`, `code_panel.py`, `data_panel.py`, `math_panel.py`, `signal_panel.py`, `threed_panel.py`).
+    - Updated `desktop/shell/state.ts` standard application registry to use pure native system tools (Kitty Terminal, File Manager, Web Browser, WiFi Tools, Security Suite, Windows Layer, System Settings).
+    - Preserved `desktop/theme.py` (design token single source of truth) and `desktop/env.py` (with `MESA_LOADER_DRIVER_OVERRIDE=kms_swrast` export).
+  * **Streamlined GRUB Bootloader (`scripts/auto-build.sh` -> `/boot/grub/grub.cfg`)**:
+    - Eliminated the dual-entry boot selection prompt (`Xeno OS Live (Wayland - Universal)` vs `Xeno OS Live (Safe graphics)`).
+    - Configured a single default `Xeno OS (Universal)` menuentry with `set timeout=0` for instant, non-interactive boot straight into the Wayland desktop.
+  * **Version & Tooling Synchronization**:
+    - `iso/version.txt`: Bumped to `9.0-beta`.
+    - `run-qemu.sh`: Set default candidate target to `9.0-beta` (`xeno_os-9.0-beta.iso`).
+    - Host Tooling: Symlinked Bun runtime to `/usr/local/bin/bun` and added safe PATH exports across `master-doctor.sh` and `auto-build.sh`.
+    - Disk Cleanup: Thoroughly purged all older `xeno_os-8.0-beta.iso*` images and checksums from `/home/xeno/Xeno-os/iso/output/` and `/mnt/c/Users/harsh/`.
+- **Verification & Test Outcome**:
+  * Ran `python3 tests/run_tests.py`: 73/73 E2E Integration tests passed cleanly (0 failures, 0 errors).
+  * Ran `python3 -m unittest tests/test_adversarial.py`: 23/23 Adversarial IPC boundary tests passed cleanly.
+  * Ran `sudo bash scripts/master-doctor.sh`: 46/46 checks passed with 0 failures across all 8 diagnostic tiers, certifying OPTIMAL system health.

@@ -4,6 +4,7 @@
 # ═══════════════════════════════════════════════════════════════
 set -euo pipefail
 
+export PATH="/usr/local/bin:/usr/bin:/bin:$HOME/.bun/bin:/home/xeno/.bun/bin:${PATH:-}"
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION_FILE="$WS_DIR/iso/version.txt"
 mkdir -p "$WS_DIR/iso"
@@ -226,8 +227,7 @@ chroot "$ROOTFS" /bin/bash << 'EOF'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get purge -y live-boot live-boot-initramfs-tools live-tools 2>/dev/null || true
-apt-get autoremove -y 2>/dev/null || true
-apt-get install -y --reinstall casper
+dpkg -s casper &>/dev/null || apt-get install -y --no-install-recommends casper
 
 # 6.1 ZRAM Setup
 apt-get install -y --no-install-recommends systemd-zram-generator 2>/dev/null || true
@@ -309,14 +309,10 @@ serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input serial console
 terminal_output serial console
 
-set timeout=5
+set timeout=0
 set default=0
-menuentry "Xeno OS Live (Wayland - Universal)" {
+menuentry "Xeno OS (Universal)" {
     linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 username=xeno hostname=xeno-os ---
-    initrd /casper/initrd
-}
-menuentry "Xeno OS Live (Safe graphics)" {
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200n8 console=tty1 username=xeno hostname=xeno-os xeno.safegraphics=1 ---
     initrd /casper/initrd
 }
 EOF

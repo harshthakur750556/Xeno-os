@@ -17,6 +17,7 @@ def init_qt_environment():
         is_vm = True
 
     if is_vm or os.environ.get("XENO_FORCE_SOFTWARE_RENDER") == "1":
+        os.environ.setdefault("MESA_LOADER_DRIVER_OVERRIDE", "kms_swrast")
         os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
         os.environ.setdefault("QT_QUICK_BACKEND", "software")
         os.environ.setdefault("GALLIUM_DRIVER", "llvmpipe")

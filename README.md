@@ -6,7 +6,7 @@
 
 # XENO OS — Next-Generation Hybrid Scientific & Security Platform
 
-> **XENO OS (v8.0-BETA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a lightweight TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), PySide6 scientific computing panels, high-throughput ZRAM memory compression, and open root sovereignty.
+> **XENO OS (v9.0-BETA Noble Cyber-Nord)** is a bare-metal and VM-agnostic Linux operating system combining a custom low-latency XanMod BORE kernel with Kali packet injection patches, a high-performance 100% TypeScript/Astal v2 desktop shell on Hyprland Wayland, universal cross-platform application execution (`.apk`, `.exe`/`.msi`, `.AppImage`, `.deb`, `.iso`), fail-safe DRM KMS software rendering with self-healing fallback, high-throughput ZRAM memory compression, and open root sovereignty.
 
 ---
 
@@ -17,7 +17,7 @@
 ![Security](https://img.shields.io/badge/Security-Kali_mac80211_Patched-FF5555?style=for-the-badge&logo=kalilinux&logoColor=white)
 ![ZRAM](https://img.shields.io/badge/ZRAM-zstd_50%25_RAM-00FFA3?style=for-the-badge&logo=speedtest&logoColor=black)
 ![Shell](https://img.shields.io/badge/Shell-Astal_v2_Typescript_Bun-00FFA3?style=for-the-badge&logo=bun&logoColor=black)
-![Tests](https://img.shields.io/badge/Tests-96_Passing_5_Tiers-50FA7B?style=for-the-badge&logo=pytest&logoColor=black)
+![Tests](https://img.shields.io/badge/Tests-96_Passing_8_Tiers-50FA7B?style=for-the-badge&logo=pytest&logoColor=black)
 
 ---
 
@@ -31,16 +31,16 @@
 | **Kernel Synchronization** | Fast in-kernel `CONFIG_NTSYNC=y` (Direct Wine/Proton multi-threading synchronization) |
 | **Memory Compression (ZRAM)** | `systemd-zram-generator` with **Zstd compression**, dynamic 50% RAM allocation (`ram / 2`) |
 | **Virtual Memory Tuning** | `vm.max_map_count=1048576` for high-concurrency VMA handling (Wine/Proton/Scientific workloads) |
-| **Display Compositor** | Hyprland Wayland Compositor (with adaptive Mesa `llvmpipe`/`softpipe` fallback for VMs) |
-| **Desktop Shell** | TypeScript Astal v2 GTK3 Surface Layer running on the **Bun** runtime engine |
-| **Scientific Workspace Suite** | Modular Python / PySide6 GUI panels (SymPy Math, Pandas Data, Code, SciPy Signal, VTK 3D) |
+| **Display Compositor** | Hyprland Wayland Compositor (with Mesa `kms_swrast`/`llvmpipe` driver override & dynamic self-healing supervisor for VMs) |
+| **Desktop Shell** | 100% Native TypeScript Astal v2 GTK3 Surface Layer running on the **Bun** runtime engine |
+| **Universal Workspace Apps** | Kitty Terminal, Files, Chrome/Firefox, WiFi Monitor, Pentest Suite, Windows Compatibility Layer |
 | **Windows App Execution** | Wine Staging 9.x + DXVK + VKD3D-Proton + Bottles + `WINEESYNC=1` + `WINEFSYNC=1` + `i386` multiarch |
 | **Android App Execution** | Waydroid AOSP Subsystem sharing Linux kernel binder & Wayland display buffers |
 | **Linux Standalone Apps** | Direct FUSE 2/3 runtime (`libfuse2t64`) for zero-install `.AppImage` execution + Flatpak/Flathub |
 | **Security & Pentest Stack** | Kali `mac80211` & `cfg80211` packet injection patches + Pinned Kali Rolling repo (`Priority: 100`) |
 | **Wireless Adapter Drivers** | Broad in-tree kernel drivers (Intel `iwlwifi`, Atheros `ath9k`/`ath10k`, MediaTek `mt76`, Realtek `rtw88`/`89`, Broadcom) + Realtek injection DKMS installer ([`drivers/install-oot-wifi.sh`](file:///home/xeno/Xeno-os/drivers/install-oot-wifi.sh)) |
 | **Local AI Engine & Sandbox** | `xeno-ai-engine` (Ollama/llama.cpp @ `/var/cache/xeno-ai/models`) + Bubblewrap (`bwrap`) isolation |
-| **Live Boot & ISO Engine** | Casper Live Overlay (`boot=casper`), ZSTD Level 19 1MB-block SquashFS, GRUB ISO Level 3 (`XENOOS`) |
+| **Live Boot & ISO Engine** | Casper Live Overlay (`boot=casper`), Instant Universal Boot (`timeout=0`), ZSTD Level 19 SquashFS, GRUB ISO Level 3 (`XENOOS`) |
 | **Diagnostic & Auto-Heal** | [`scripts/master-doctor.sh`](file:///home/xeno/Xeno-os/scripts/master-doctor.sh) (8-Tier audit engine with `--fix` self-healing) |
 | **Test Verification** | 96 Automated Tests (73 E2E Integration + 23 Adversarial IPC boundary tests) |
 
@@ -82,12 +82,12 @@ Xeno OS is distributed across three distinct edition tiers tailored to different
 
 ### 2. 🟣 BETA VERSION — Interactive Cyber-Nord Desktop (With GUI)
 * **Target Output**: `iso/output/BETA VERSION/`
-* **Architecture**: Everything in the Alpha base + full graphical hardware-accelerated Wayland display stack.
+* **Architecture**: Everything in the Alpha base + full graphical hardware-accelerated & fail-safe software Wayland display stack.
 * **Included Stack**:
-  - **Hyprland Wayland Compositor**: Shader-accelerated tiling window manager with dynamic LLVMpipe software rasterizer fallback for VMs.
-  - **Astal v2 / Bun Shell**: Real-time Cyber-Nord top bar, fuzzy application search launcher (`Super+Space`), and interactive notification center.
-  - **PySide6 Scientific Suite**: Modular multi-threaded computational workspace (SymPy Calculus, Pandas Analytics, Code IDE, SciPy DSP, VTK 3D).
-  - **Universal App GUI**: Seamless windowed execution for Windows (`.exe`/`.msi`), Android (`.apk`), AppImages, and Debian packages.
+  - **Hyprland Wayland Compositor**: Shader-accelerated tiling window manager with fail-safe Mesa `kms_swrast`/`llvmpipe` software rasterizer and self-healing supervisor for VMs (VirtualBox, VMware, QEMU, Hyper-V) and bare metal.
+  - **Astal v2 / Bun Desktop Shell**: 100% Native TypeScript UI with real-time Cyber-Nord top bar (`Bar.ts`), fuzzy application search launcher (`Launcher.ts` on `Super+Space`), and toast notification daemon (`Notifications.ts`).
+  - **Universal App Execution**: Seamless windowed execution for Windows (`.exe`/`.msi`), Android (`.apk`), AppImages, Flatpaks, and Debian packages.
+  - **Instant Live Boot**: Single default Universal boot entry with zero countdown delays (`timeout=0`), booting straight into the graphical Wayland environment.
 * **Ideal For**: Interactive daily driving, scientific computation, graphical security simulation, and multimedia/gaming workloads.
 
 ### 3. 🟢 OMEGA VERSION — Final Stable Gold Master (Enterprise Edition)
@@ -426,7 +426,7 @@ Xeno OS features a native TypeScript desktop shell built on **Astal v2** (GTK3) 
 
 ### 5. Cyber-Nord Design Tokens (Single Source of Truth)
 
-All visual properties across both Python PySide6 panels and TypeScript Astal shell strictly adhere to central theme tokens ([`desktop/theme.py`](file:///home/xeno/Xeno-os/desktop/theme.py) and [`desktop/shell/theme.ts`](file:///home/xeno/Xeno-os/desktop/shell/theme.ts)):
+All visual properties across the TypeScript Astal desktop shell strictly adhere to central theme tokens ([`desktop/shell/theme.ts`](file:///home/xeno/Xeno-os/desktop/shell/theme.ts) and [`desktop/theme.py`](file:///home/xeno/Xeno-os/desktop/theme.py)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐

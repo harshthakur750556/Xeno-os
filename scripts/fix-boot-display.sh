@@ -147,13 +147,18 @@ export WINEESYNC="${WINEESYNC:-1}"
 export WINEFSYNC="${WINEFSYNC:-1}"
 
 force_software() {
-    echo "[xeno-start-hyprland] Software rendering enabled ($1)"
-    export WLR_NO_HARDWARE_CURSORS=1
-    export LIBGL_ALWAYS_SOFTWARE=1
+    local reason="${1:-forced}"
+    echo "[xeno-start-hyprland] Software rendering fallback engaged ($reason)"
+    # Direct Mesa KMS loader to use KMS Software Rasterizer (llvmpipe)
+    # This completely bypasses broken DRI2/SVGA3D screen initialization on VirtualBox VMSVGA, VMware, and QEMU.
+    export MESA_LOADER_DRIVER_OVERRIDE=kms_swrast
     export GALLIUM_DRIVER=llvmpipe
+    export LIBGL_ALWAYS_SOFTWARE=1
     export __GLX_VENDOR_LIBRARY_NAME=mesa
+    export WLR_NO_HARDWARE_CURSORS=1
     export WLR_RENDERER_ALLOW_SOFTWARE=1
     export WLR_RENDERER=gles2
+    # Aquamarine DRM backend flags for software/VM framebuffers
     export AQ_NO_MODIFIERS=1
     export AQ_FORCE_LINEAR_BLIT=1
     export AQ_MGPU_NO_EXPLICIT=1
@@ -164,36 +169,84 @@ force_software() {
     export XCURSOR_SIZE=24
     export XCURSOR_THEME=Adwaita
     export LIBSEAT_BACKEND="${LIBSEAT_BACKEND:-logind}"
-    unset MESA_LOADER_DRIVER_OVERRIDE || true
+    export QT_QUICK_BACKEND=software
+    export QTWEBENGINE_DISABLE_GPU=1
 }
 
-# Kernel cmdline opt: xeno.safegraphics=1
-if grep -qw 'xeno.safegraphics=1' /proc/cmdline 2>/dev/null; then
-    force_software "cmdline"
-else
+# Check if software rendering is requested or VM detected
+IS_VM=0
+VM_REASON=""
+
+if grep -qwE 'xeno\.safegraphics=1|nomodeset|xeno\.swrender=1' /proc/cmdline 2>/dev/null; then
+    IS_VM=1
+    VM_REASON="cmdline (safegraphics/nomodeset)"
+fi
+
+if [ "$IS_VM" -eq 0 ]; then
     VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || echo "none")
     case "$VIRT_TYPE" in
-        microsoft|hyperv|oracle|vmware|kvm|qemu|xen|bochs)
-            force_software "VM:$VIRT_TYPE"
-            ;;
-        none|*)
-            # Bare metal: prefer hardware GL/Vulkan for smooth desktop + Windows apps
-            echo "[xeno-start-hyprland] Bare-metal — hardware rendering"
-            unset LIBGL_ALWAYS_SOFTWARE || true
-            unset MESA_LOADER_DRIVER_OVERRIDE || true
-            unset GALLIUM_DRIVER || true
-            if [ -x /usr/bin/xeno-hardware-detect ]; then
-                source /usr/bin/xeno-hardware-detect
-            fi
-            export WLR_NO_HARDWARE_CURSORS="${WLR_NO_HARDWARE_CURSORS:-0}"
-            export AQ_NO_MODIFIERS="${AQ_NO_MODIFIERS:-1}"
-            export AQ_FORCE_LINEAR_BLIT="${AQ_FORCE_LINEAR_BLIT:-1}"
-            export AQ_MGPU_NO_EXPLICIT="${AQ_MGPU_NO_EXPLICIT:-1}"
-            export HYPRLAND_EGL_NO_MODIFIERS="${HYPRLAND_EGL_NO_MODIFIERS:-1}"
-            export XCURSOR_SIZE=24
-            export XCURSOR_THEME=Adwaita
+        microsoft|hyperv|oracle|virtualbox|vmware|kvm|qemu|xen|bochs|parallels|bhyve)
+            IS_VM=1
+            VM_REASON="systemd-detect-virt:$VIRT_TYPE"
             ;;
     esac
+fi
+
+if [ "$IS_VM" -eq 0 ]; then
+    # DMI inspection
+    DMI_STR=""
+    for dmi in /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/board_vendor; do
+        if [ -f "$dmi" ]; then
+            DMI_STR="$DMI_STR $(cat "$dmi" 2>/dev/null || true)"
+        fi
+    done
+    if echo "$DMI_STR" | grep -qiE 'innotek|virtualbox|vmware|qemu|kvm|bochs|microsoft|parallels'; then
+        IS_VM=1
+        VM_REASON="DMI signature"
+    fi
+fi
+
+if [ "$IS_VM" -eq 0 ]; then
+    # DRM device driver inspection
+    for drv_path in /sys/class/drm/card*/device/driver; do
+        if [ -d "$drv_path" ]; then
+            DRV_NAME=$(basename "$(readlink -f "$drv_path" 2>/dev/null || true)" 2>/dev/null || true)
+            case "$DRV_NAME" in
+                vmwgfx|vboxvideo|bochs-drm|cirrus|simpledrm|hyperv_drm|ast|mgag200)
+                    IS_VM=1
+                    VM_REASON="DRM driver:$DRV_NAME"
+                    break
+                    ;;
+            esac
+        fi
+    done
+fi
+
+if [ "$IS_VM" -eq 0 ] && command -v lspci >/dev/null 2>&1; then
+    if lspci 2>/dev/null | grep -qiE 'virtualbox|vmware|qemu|cirrus|bochs|red hat, inc. virtio'; then
+        IS_VM=1
+        VM_REASON="PCI adapter signature"
+    fi
+fi
+
+if [ "$IS_VM" -eq 1 ]; then
+    force_software "$VM_REASON"
+else
+    # Bare metal: prefer hardware GL/Vulkan for smooth desktop + Windows apps
+    echo "[xeno-start-hyprland] Bare-metal detected — hardware acceleration engaged"
+    unset MESA_LOADER_DRIVER_OVERRIDE || true
+    unset LIBGL_ALWAYS_SOFTWARE || true
+    unset GALLIUM_DRIVER || true
+    if [ -x /usr/bin/xeno-hardware-detect ]; then
+        source /usr/bin/xeno-hardware-detect
+    fi
+    export WLR_NO_HARDWARE_CURSORS="${WLR_NO_HARDWARE_CURSORS:-0}"
+    export AQ_NO_MODIFIERS="${AQ_NO_MODIFIERS:-1}"
+    export AQ_FORCE_LINEAR_BLIT="${AQ_FORCE_LINEAR_BLIT:-1}"
+    export AQ_MGPU_NO_EXPLICIT="${AQ_MGPU_NO_EXPLICIT:-1}"
+    export HYPRLAND_EGL_NO_MODIFIERS="${HYPRLAND_EGL_NO_MODIFIERS:-1}"
+    export XCURSOR_SIZE=24
+    export XCURSOR_THEME=Adwaita
 fi
 
 # Ensure user config directory exists
@@ -202,18 +255,37 @@ if [ ! -f "$HOME/.config/hypr/hyprland.conf" ] && [ -f /etc/skel/.config/hypr/hy
     cp -f /etc/skel/.config/hypr/hyprland.conf "$HOME/.config/hypr/hyprland.conf"
 fi
 
-echo "[xeno-start-hyprland] Starting Hyprland..."
-if [ -x /usr/bin/start-hyprland ]; then
-    RUN_CMD=("/usr/bin/start-hyprland" "--" "--config" "$HOME/.config/hypr/hyprland.conf")
-else
-    RUN_CMD=("/usr/bin/Hyprland" "--config" "$HOME/.config/hypr/hyprland.conf")
+start_hyprland() {
+    echo "[xeno-start-hyprland] Starting Hyprland..."
+    if [ -x /usr/bin/start-hyprland ]; then
+        RUN_CMD=("/usr/bin/start-hyprland" "--" "--config" "$HOME/.config/hypr/hyprland.conf")
+    else
+        RUN_CMD=("/usr/bin/Hyprland" "--config" "$HOME/.config/hypr/hyprland.conf")
+    fi
+
+    if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+        dbus-run-session -- "${RUN_CMD[@]}"
+    else
+        "${RUN_CMD[@]}"
+    fi
+}
+
+T_START=$(date +%s)
+start_hyprland
+EXIT_CODE=$?
+T_END=$(date +%s)
+T_RUN=$((T_END - T_START))
+
+# Self-healing supervisor: If Hyprland exited rapidly with an error (e.g. EGL failure), fallback to kms_swrast
+if [ "$EXIT_CODE" -ne 0 ] && [ "$T_RUN" -lt 5 ]; then
+    echo "[xeno-start-hyprland] ⚠ Hyprland exited (Code: $EXIT_CODE after ${T_RUN}s)."
+    echo "[xeno-start-hyprland] 🔧 Engaging self-healing KMS software rasterizer fallback..."
+    force_software "Self-Healing Fallback after startup failure"
+    start_hyprland
+    EXIT_CODE=$?
 fi
 
-if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-    exec dbus-run-session -- "${RUN_CMD[@]}"
-else
-    exec "${RUN_CMD[@]}"
-fi
+exit "$EXIT_CODE"
 LAUNCHER_EOF
 chmod +x "$ROOTFS/usr/bin/xeno-start-hyprland"
 

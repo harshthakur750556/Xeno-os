@@ -20,15 +20,14 @@ export interface Application {
   icon: string;
 }
 
-// Fallback applications from .cursorrules
 export const standardApps: Application[] = [
-  { id: "math", name: "Math Solver", exec: "python3 ${WS_DIR}/desktop/panels/math_panel.py", icon: "accessories-calculator" },
-  { id: "data", name: "Data Analysis", exec: "python3 ${WS_DIR}/desktop/panels/data_panel.py", icon: "office-chart" },
-  { id: "code", name: "Code Notebook", exec: "python3 ${WS_DIR}/desktop/panels/code_panel.py", icon: "accessories-text-editor" },
-  { id: "threed", name: "3D Viewer", exec: "python3 ${WS_DIR}/desktop/panels/threed_panel.py", icon: "image-viewer" },
-  { id: "signal", name: "Signal Analysis", exec: "python3 ${WS_DIR}/desktop/panels/signal_panel.py", icon: "media-record" },
   { id: "terminal", name: "Terminal", exec: "kitty", icon: "utilities-terminal" },
-  { id: "settings", name: "Settings", exec: "python3 ${WS_DIR}/desktop/settings.py", icon: "preferences-system" }
+  { id: "files", name: "Files", exec: "nautilus || thunar || pcmanfm", icon: "system-file-manager" },
+  { id: "browser", name: "Browser", exec: "google-chrome-stable || firefox || chromium", icon: "web-browser" },
+  { id: "wifi", name: "WiFi Tools", exec: "xeno-wifi-monitor", icon: "network-wireless" },
+  { id: "security", name: "Security Suite", exec: "kitty -e msfconsole", icon: "security-high" },
+  { id: "windows", name: "Windows App Layer", exec: "xeno-windows", icon: "application-x-executable" },
+  { id: "settings", name: "Settings", exec: "gnome-control-center || kitty -e nmtui", icon: "preferences-system" }
 ];
 
 // Live State Variables

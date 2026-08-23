@@ -1,6 +1,6 @@
 #!/bin/bash
 WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "8.0-beta")
+BUILD_VER=$(tr -d '[:space:]' < "$WS_DIR/iso/version.txt" 2>/dev/null || echo "9.0-beta")
 ISO_PATH=""
 CANDIDATE_PATHS=(
     "$WS_DIR/iso/output/BETA VERSION/xeno_os-${BUILD_VER}.iso"
