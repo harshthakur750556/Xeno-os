@@ -17,8 +17,30 @@ mkdir -p "$WS_DIR/iso"
 if [ -f "$VERSION_FILE" ]; then
     BUILD_VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
 else
-    BUILD_VERSION="9.0-beta"
+    BUILD_VERSION="10.0-beta"
 fi
+
+WIN_HOST_DIR="/mnt/c/Users/harsh"
+TIER_NAME="BETA VERSION"
+ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
+OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
+TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
+
+resolve_tier_and_iso() {
+    if [[ "$BUILD_VERSION" =~ beta|BETA ]]; then
+        TIER_NAME="BETA VERSION"
+        ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
+    elif [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
+        TIER_NAME="OMEGA VERSION"
+        ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
+    else
+        TIER_NAME="ALPHA VERSION"
+        ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
+    fi
+    OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
+    TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
+}
+resolve_tier_and_iso
 
 # ── Cyber-Nord Visual Tokens & Terminal Capabilities ─────────────────────────
 IS_TTY=0
@@ -63,6 +85,7 @@ render_edition_selector() {
 SELECTOR_BANNER_EOF
     echo -e "${C_BLUE} ═══ XENO OS EDITION & RELEASE TARGET MATRIX ═══${C_RESET}\n"
 
+    resolve_tier_and_iso
     local current_tier_badge="$C_GREEN[ BETA ]$C_RESET"
     local current_stability="$(render_bar 80 100 16 "$C_GREEN")"
     if [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
@@ -74,31 +97,31 @@ SELECTOR_BANNER_EOF
     fi
 
     echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}CURRENT ACTIVE TARGET MILESTONE${C_RESET}                                             ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}CURRENT ACTIVE TARGET MILESTONE${C_RESET}"
     echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Active Version:${C_RESET}    %-45b ${C_DIM}│${C_RESET}\n" "${C_BOLD}${BUILD_VERSION}${C_RESET} ${current_tier_badge}"
-    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Channel Stability:${C_RESET} %-45b ${C_DIM}│${C_RESET}\n" "${current_stability}"
-    printf "${C_DIM}│${C_RESET}  ${C_BOLD}Release Target:${C_RESET}    ${C_DIM}%-45s${C_RESET} ${C_DIM}│${C_RESET}\n" "iso/output/${TIER_NAME}/${ISO_NAME}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Active Version:${C_RESET}    ${BUILD_VERSION} ${current_tier_badge}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Channel Stability:${C_RESET} ${current_stability}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BOLD}Release Target:${C_RESET}    ${C_DIM}iso/output/${TIER_NAME}/${ISO_NAME}${C_RESET}"
     echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}Select Release Channel or Milestone Action:${C_RESET}                                  ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_BOLD}BETA EDITION${C_RESET}    %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 80 100 14 "$C_GREEN")"
-    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Standard Release Candidate Pipeline (Feature-Complete Channel)${C_RESET}          ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_BLUE}[2]${C_RESET} ${C_BOLD}ALPHA EDITION${C_RESET}   %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 40 100 14 "$C_BLUE")"
-    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Experimental Rolling Canary Substrate (Cutting-Edge Development)${C_RESET}       ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_MAGENTA}[3]${C_RESET} ${C_BOLD}OMEGA EDITION${C_RESET}   %-28b ${C_DIM}│${C_RESET}\n" "$(render_bar 100 100 14 "$C_MAGENTA")"
-    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Sovereign Master Production Gold Image (Ultimate Release Channel)${C_RESET}      ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_YELLOW}[4]${C_RESET} ${C_BOLD}RECREATE ISO${C_RESET}    %-28b ${C_DIM}│${C_RESET}\n" "${C_YELLOW}[SNAPSHOT FREEZE]${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Re-package current milestone (${BUILD_VERSION}) without incrementing${C_RESET}        ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    printf "${C_DIM}│${C_RESET}  ${C_CYAN}[5]${C_RESET} ${C_BOLD}CUSTOM VERSION${C_RESET}  %-28b ${C_DIM}│${C_RESET}\n" "${C_CYAN}[MANUAL TAG]${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Specify manual semantic versioning string (e.g. 10.0-beta, 1.0-omega)${C_RESET}   ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}                                                                             ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_TEXT}[6] PROCEED WITH CURRENT ACTIVE (${BUILD_VERSION})${C_RESET}                                  ${C_DIM}│${C_RESET}"
-    echo -e "${C_DIM}│${C_RESET}  ${C_DIM}[0] CANCEL AND EXIT${C_RESET}                                                        ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}Select Release Channel or Milestone Action:${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_GREEN}[1]${C_RESET} ${C_BOLD}BETA EDITION${C_RESET}    $(render_bar 80 100 14 "$C_GREEN")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Standard Release Candidate Pipeline (Feature-Complete Channel)${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_BLUE}[2]${C_RESET} ${C_BOLD}ALPHA EDITION${C_RESET}   $(render_bar 40 100 14 "$C_BLUE")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Experimental Rolling Canary Substrate (Cutting-Edge Development)${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_MAGENTA}[3]${C_RESET} ${C_BOLD}OMEGA EDITION${C_RESET}   $(render_bar 100 100 14 "$C_MAGENTA")"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Sovereign Master Production Gold Image (Ultimate Release Channel)${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_YELLOW}[4]${C_RESET} ${C_BOLD}RECREATE ISO${C_RESET}    ${C_YELLOW}[SNAPSHOT FREEZE]${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Re-package current milestone (${BUILD_VERSION}) without incrementing${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_CYAN}[5]${C_RESET} ${C_BOLD}CUSTOM VERSION${C_RESET}  ${C_CYAN}[MANUAL TAG]${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}      ${C_DIM}Specify manual semantic versioning string (e.g. 10.0-beta, 1.0-omega)${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_TEXT}[6] PROCEED WITH CURRENT ACTIVE (${BUILD_VERSION})${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET}  ${C_DIM}[0] CANCEL AND EXIT${C_RESET}"
     echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
 
     read -rp "Enter selection [0-6] (default: 6): " ed_choice
@@ -112,6 +135,7 @@ SELECTOR_BANNER_EOF
             val=$(python3 -c "n = float('$num'); print('10.0' if n >= 10.0 else f'{n}')")
             BUILD_VERSION="${val}-beta"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             echo -e "  ${C_GREEN}✔ Shifted to Beta Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         2)
@@ -119,6 +143,7 @@ SELECTOR_BANNER_EOF
             num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print(m.group(1) if m else '1.0')")
             BUILD_VERSION="${num}-alpha"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             echo -e "  ${C_BLUE}✔ Shifted to Alpha Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         3)
@@ -126,10 +151,12 @@ SELECTOR_BANNER_EOF
             num=$(python3 -c "import re; m = re.search(r'([0-9]+(?:\.[0-9]+)?)', '$BUILD_VERSION'); print('1.0' if float(m.group(1) if m else '1.0') < 1.0 else m.group(1))")
             BUILD_VERSION="${num}-omega"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             echo -e "  ${C_MAGENTA}✔ Shifted to Omega Edition: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         4)
             export XENO_RECREATE_ISO=1
+            resolve_tier_and_iso
             echo -e "  ${C_YELLOW}✔ Recreating active milestone snapshot: ${BUILD_VERSION} (version freeze enabled)${C_RESET}\n"
             ;;
         5)
@@ -137,10 +164,12 @@ SELECTOR_BANNER_EOF
             if [ -n "$custom_ver" ]; then
                 BUILD_VERSION=$(echo "$custom_ver" | tr -d '[:space:]')
                 echo "$BUILD_VERSION" > "$VERSION_FILE"
+                resolve_tier_and_iso
                 echo -e "  ${C_CYAN}✔ Target version set to: ${BUILD_VERSION}${C_RESET}\n"
             fi
             ;;
         6)
+            resolve_tier_and_iso
             echo -e "  ${C_GREEN}✔ Proceeding with currently active milestone: ${BUILD_VERSION}${C_RESET}\n"
             ;;
         0|q|cancel)
@@ -148,7 +177,8 @@ SELECTOR_BANNER_EOF
             exit 0
             ;;
         *)
-            echo -e "  ${C_YELLOW}Invalid choice, continuing with active milestone: ${BUILD_VERSION}${C_RESET}\n"
+            resolve_tier_and_iso
+            echo -e "  ${C_YELLOW}Continuing with active milestone: ${BUILD_VERSION}${C_RESET}\n"
             ;;
     esac
 }
@@ -166,25 +196,30 @@ for arg in "${@:-}"; do
         --beta|--tier-beta)
             BUILD_VERSION="10.0-beta"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             INTERACTIVE_SELECT=0
             ;;
         --alpha|--tier-alpha)
             BUILD_VERSION="1.0-alpha"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             INTERACTIVE_SELECT=0
             ;;
         --omega|--tier-omega)
             BUILD_VERSION="1.0-omega"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             INTERACTIVE_SELECT=0
             ;;
         --recreate|--rebuild|--recreate-beta)
             export XENO_RECREATE_ISO=1
+            resolve_tier_and_iso
             INTERACTIVE_SELECT=0
             ;;
         --version=*|--ver=*)
             BUILD_VERSION="${arg#*=}"
             echo "$BUILD_VERSION" > "$VERSION_FILE"
+            resolve_tier_and_iso
             INTERACTIVE_SELECT=0
             ;;
     esac
@@ -194,21 +229,8 @@ if [ "$INTERACTIVE_SELECT" -eq 1 ] && [ "$IS_TTY" -eq 1 ]; then
     render_edition_selector
 fi
 
-if [[ "$BUILD_VERSION" =~ beta|BETA ]]; then
-    TIER_NAME="BETA VERSION"
-    ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
-elif [[ "$BUILD_VERSION" =~ omega|OMEGA ]]; then
-    TIER_NAME="OMEGA VERSION"
-    ISO_NAME="xeno_os-${BUILD_VERSION}.iso"
-else
-    TIER_NAME="ALPHA VERSION"
-    ISO_NAME="xeno_os-${BUILD_VERSION}-alpha.iso"
-fi
-
-OUTPUT_DIR="$WS_DIR/iso/output/$TIER_NAME"
+resolve_tier_and_iso
 mkdir -p "$OUTPUT_DIR" "$WS_DIR/iso/output/BETA VERSION"
-TARGET_ISO="$OUTPUT_DIR/${ISO_NAME}"
-WIN_HOST_DIR="/mnt/c/Users/harsh"
 
 # Clean up all older ISO and SHA256 versions across WSL & Windows host across all tiers
 find "$WS_DIR/iso/output" -maxdepth 2 \( -name "xeno_os*.iso*" -o -name "xeno_os*.sha256" \) ! -name "${ISO_NAME}*" -delete 2>/dev/null || true

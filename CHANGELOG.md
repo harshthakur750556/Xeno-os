@@ -34,6 +34,7 @@ All AI agents and developers MUST automatically append new session briefings to 
     - Resolved subshell environment disconnection where helper functions (`build_casper_initramfs`, `mksquashfs`, etc.) lost access to `$ROOTFS` and `$WS_DIR`.
     - Exported all core configuration variables (`WS_DIR`, `ROOTFS`, `CACHE_DIR`, `META_FILE`, `VOLUME_ID`, `OUTPUT_DIR`, `TARGET_ISO`, `WIN_HOST_DIR`, `TIER_NAME`, `ISO_NAME`, `BUILD_VERSION`, `ACTUAL_USER`) and exported helper functions across subshells.
     - Switched execution engine to a direct bash pipeline (`"$@" 2>&1 | python3 -u -c ...`) with `${PIPESTATUS[0]}` exit code tracking, ensuring full native shell state and mounts are preserved while streaming live synchronized logs.
+    - Implemented early `resolve_tier_and_iso` binding and refactored `render_edition_selector` layout to eliminate unbound variable crashes under `set -u` and prevent ANSI escape length distortion.
 - **Verification & Diagnostic Outcome**:
   * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
   * Verified `bash -n scripts/xeno-reaper.sh`: 0 syntax errors.
