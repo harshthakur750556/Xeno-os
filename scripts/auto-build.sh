@@ -1005,17 +1005,64 @@ EOF
 # ── STAGE 7: Optimization & Smart SquashFS Compression ───────
 render_stage_progress 7
 optimize_rootfs_caches() {
+    # 1. Prune package manager caches & temporary runtime data
+    rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* "$ROOTFS/var/cache"/* 2>/dev/null || true
+    rm -rf "$ROOTFS/var/log"/* "$ROOTFS/var/tmp"/* "$ROOTFS/tmp"/* 2>/dev/null || true
     rm -rf "$ROOTFS/root/.cache" "$ROOTFS/root/.npm" "$ROOTFS/root/.cargo/registry" 2>/dev/null || true
-    rm -rf "$ROOTFS/var/cache/apt/archives"/* "$ROOTFS/var/lib/apt/lists"/* 2>/dev/null || true
-    rm -rf "$ROOTFS/tmp"/* "$ROOTFS/var/tmp"/* "$ROOTFS/var/log"/* 2>/dev/null || true
-    rm -rf "$ROOTFS/usr/src/linux-headers-"* 2>/dev/null || true
+    rm -rf "$ROOTFS/home"/*/.cache 2>/dev/null || true
+
+    # 2. Prune obsolete kernel module trees (keep only active boot kernel & latest fallback)
+    local active_kver="${KVER:-}"
+    if [ -d "$ROOTFS/lib/modules" ]; then
+        for mod_dir in "$ROOTFS/lib/modules"/*; do
+            [ -d "$mod_dir" ] || continue
+            local dname
+            dname=$(basename "$mod_dir")
+            if [ -n "$active_kver" ] && [ "$dname" != "$active_kver" ] && [[ "$dname" != *"generic"* ]]; then
+                rm -rf "$mod_dir"
+            elif [[ "$dname" == "6.8.0-124-generic" ]] || [[ "$dname" == "6.8.0-136-generic" ]] || [[ "$dname" == "6.8.0-137-generic" ]]; then
+                rm -rf "$mod_dir"
+            fi
+        done
+    fi
+
+    # 3. Prune Flatpak OSTree loose objects, build temp, and duplicate runtimes
+    rm -rf "$ROOTFS/var/lib/flatpak/repo/tmp"/* "$ROOTFS/var/lib/flatpak/repo/objects"/* 2>/dev/null || true
+    rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*/*/Locale 2>/dev/null || true
+
+    # 4. Prune documentation, manual pages, help files, and info catalogs
+    rm -rf "$ROOTFS/usr/share/doc"/* "$ROOTFS/usr/share/man"/* "$ROOTFS/usr/share/help"/* "$ROOTFS/usr/share/info"/* 2>/dev/null || true
+    rm -rf "$ROOTFS/usr/share/gtk-doc"/* "$ROOTFS/usr/share/gnome/help"/* 2>/dev/null || true
+
+    # 5. Prune C/C++ development headers & Go source trees (not needed in live runtime)
+    rm -rf "$ROOTFS/usr/include"/* "$ROOTFS/usr/src"/* "$ROOTFS/usr/share/go-"* 2>/dev/null || true
     rm -rf "$ROOTFS/usr/local/lib/ollama/cuda_v12" "$ROOTFS/usr/local/lib/ollama/cuda_v13" 2>/dev/null || true
-    find "$ROOTFS/usr/lib/modules" -mindepth 1 -maxdepth 1 -type d -empty -delete 2>/dev/null || true
-    rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*.Locale 2>/dev/null || true
+
+    # 6. Prune debug symbols & unused compilers
+    rm -rf "$ROOTFS/usr/lib/debug" 2>/dev/null || true
+    rm -rf "$ROOTFS/usr/lib/llvm-14" "$ROOTFS/usr/lib/llvm-17" 2>/dev/null || true
+
+    # 7. Prune non-English translations from /usr/share/locale (keeping en, en_US, en_GB)
+    if [ -d "$ROOTFS/usr/share/locale" ]; then
+        for loc in "$ROOTFS/usr/share/locale"/*; do
+            [ -d "$loc" ] || continue
+            local lname
+            lname=$(basename "$loc")
+            case "$lname" in
+                en|en_US|en_GB|locale.alias|C|POSIX)
+                    ;;
+                *)
+                    rm -rf "$loc" 2>/dev/null || true
+                    ;;
+            esac
+        done
+    fi
+
+    # 8. Prune Python bytecode and cache directories
     find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
 
-    # Clean temporary staging directory & partial downloads
+    # 9. Clean staging directory & temporary download parts
     rm -rf "$WS_DIR/cache/staging" 2>/dev/null || true
     find "$WS_DIR/cache" "$WS_DIR/kernel/cache" -maxdepth 2 -type f \( -name "*.part" -o -name "*.tmp" -o -name "*.dpkg-new" \) -delete 2>/dev/null || true
 
@@ -1030,13 +1077,16 @@ build_squashfs_image() {
         -comp zstd -Xcompression-level 19 -b 1M -noappend -progress \
         -wildcards \
         -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
-        -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
-        -e "root/.cache/*" "root/.npm/*" "root/.cargo/registry/*" \
-        -e "home/*/.cache/*" \
+        -e "var/cache/*" "var/log/*" "var/tmp/*" "var/backups/*" "var/crash/*" \
+        -e "var/lib/apt/lists/*" \
+        -e "var/lib/flatpak/repo/tmp/*" "var/lib/flatpak/repo/objects/*" \
+        -e "root/.cache/*" "root/.npm/*" "root/.cargo/*" \
+        -e "home/*/.cache/*" "home/*/.npm/*" \
         -e "usr/share/doc/*" "usr/share/man/*" "usr/share/info/*" "usr/share/help/*" \
+        -e "usr/share/gtk-doc/*" "usr/share/gnome/help/*" \
         -e "usr/include/*" "usr/src/*" \
+        -e "usr/lib/debug/*" \
         -e "usr/local/lib/ollama/cuda_*" \
-        -e "var/lib/flatpak/runtime/*/*.Locale/*" \
         -e "**/__pycache__/*" "**/*.pyc" "**/*.pyo" \
         -e "proc/.*" "sys/.*" "dev/.*" "tmp/.*" "run/.*"
 }
