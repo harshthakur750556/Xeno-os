@@ -35,13 +35,26 @@ chroot_or_host apt-get install -y --no-install-recommends \
     "linux-headers-$(chroot_or_host uname -r 2>/dev/null || echo meta)" \
     2>/dev/null || chroot_or_host apt-get install -y dkms build-essential git bc linux-headers-generic
 
+# Persistent driver source download store
+DRIVER_SRC_CACHE="$WS_DIR/cache/downloads/drivers/rtl8812au"
+mkdir -p "$(dirname "$DRIVER_SRC_CACHE")"
+
+if [ -d "$DRIVER_SRC_CACHE/.git" ]; then
+    echo "Using cached rtl8812au driver repository in $DRIVER_SRC_CACHE"
+    git -C "$DRIVER_SRC_CACHE" pull --ff-only 2>/dev/null || true
+else
+    echo "Cloning rtl8812au driver into persistent cache ($DRIVER_SRC_CACHE)..."
+    git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git "$DRIVER_SRC_CACHE" 2>/dev/null || true
+fi
+
 # aircrack-ng rtl8812au (commonly used injection NIC family)
 if [ "$TARGET_ROOT" != "/" ]; then
     echo "Building OOT Wi-Fi driver inside ROOTFS chroot..."
     BUILD="$TARGET_ROOT/tmp/xeno-oot-wifi"
     rm -rf "$BUILD"
     mkdir -p "$BUILD"
-    if git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git "$BUILD/rtl8812au" 2>/dev/null; then
+    if [ -d "$DRIVER_SRC_CACHE" ]; then
+        cp -r "$DRIVER_SRC_CACHE" "$BUILD/rtl8812au"
         KVER=$(ls "$TARGET_ROOT/lib/modules" 2>/dev/null | grep -v dpkg-new | sort -V | tail -1 || true)
         if [ -n "$KVER" ] && [ -d "$TARGET_ROOT/lib/modules/$KVER/build" ]; then
             chroot "$TARGET_ROOT" bash -c "cd /tmp/xeno-oot-wifi/rtl8812au && make KVER=$KVER KSRC=/lib/modules/$KVER/build -j\$(nproc) && make KVER=$KVER KSRC=/lib/modules/$KVER/build install" || echo "WARNING: OOT wifi build failed, continuing..."
@@ -49,22 +62,22 @@ if [ "$TARGET_ROOT" != "/" ]; then
             echo "Skipping OOT WiFi build (no headers directory found for $KVER inside rootfs)."
         fi
     else
-        echo "WARNING: Could not clone rtl8812au repository (network offline or host unreachable). Skipping OOT WiFi build."
+        echo "WARNING: No rtl8812au source available. Skipping OOT WiFi build."
     fi
     rm -rf "$BUILD"
 else
     BUILD=/tmp/xeno-oot-wifi
     rm -rf "$BUILD"
     mkdir -p "$BUILD"
-    cd "$BUILD"
-    git clone --depth=1 https://github.com/aircrack-ng/rtl8812au.git
-    cd rtl8812au
-    # DKMS install when possible
-    if command -v dkms >/dev/null 2>&1; then
-        make dkms_install || make && make install
-    else
-        make -j"$(nproc)"
-        make install
+    if [ -d "$DRIVER_SRC_CACHE" ]; then
+        cp -r "$DRIVER_SRC_CACHE" "$BUILD/rtl8812au"
+        cd "$BUILD/rtl8812au"
+        if command -v dkms >/dev/null 2>&1; then
+            make dkms_install || make && make install
+        else
+            make -j"$(nproc)"
+            make install
+        fi
     fi
 fi
 

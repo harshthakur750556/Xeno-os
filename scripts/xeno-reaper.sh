@@ -1999,22 +1999,31 @@ run_stage_kernel() {
         echo -e "${C_RED}[ERROR] No linux-image-*.deb found in $OUT_DIR. Build kernel first.${C_RESET}"
         return 1
     fi
-    mkdir -p "$CACHE_DIR"
+    mkdir -p "$CACHE_DIR" "$WS_DIR/cache/downloads/kernel"
     rm -f "$CACHE_DIR"/*.deb
     cp "$OUT_DIR"/*.deb "$CACHE_DIR/"
+    cp "$OUT_DIR"/*.deb "$WS_DIR/cache/downloads/kernel/" 2>/dev/null || true
     cat > "$META_FILE" << EOF
 {
   "tagName": "local-build-$(date +%Y%m%d%H%M%S)",
   "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
-    echo -e "  ${C_GREEN}✔ [SUCCESS]${C_RESET} Kernel packages staged in $CACHE_DIR\n"
+    cp "$META_FILE" "$WS_DIR/cache/downloads/kernel/" 2>/dev/null || true
+    echo -e "  ${C_GREEN}✔ [SUCCESS]${C_RESET} Kernel packages staged in $CACHE_DIR & mirrored to cache/downloads/kernel/\n"
 }
 
 run_fix_kernel_rootfs() {
     xeno_require_root
     echo -e "${C_BOLD}${C_CYAN}▶ [KERNEL-FIX] Repairing & Installing Kernel into RootFS...${C_RESET}"
     
+    # Restore from persistent backup folder if needed
+    if ! ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && ls "$WS_DIR/cache/downloads/kernel"/linux-image-*.deb &>/dev/null; then
+        mkdir -p "$CACHE_DIR"
+        cp "$WS_DIR/cache/downloads/kernel"/*.deb "$CACHE_DIR/" 2>/dev/null || true
+        [ -f "$WS_DIR/cache/downloads/kernel/latest_release.json" ] && cp "$WS_DIR/cache/downloads/kernel/latest_release.json" "$META_FILE" 2>/dev/null || true
+    fi
+
     local use_fallback=1
     if [ "${XENO_SKIP_CUSTOM:-0}" = "1" ]; then
         use_fallback=1

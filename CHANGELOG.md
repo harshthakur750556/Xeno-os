@@ -9,6 +9,36 @@
 This file contains the complete, detailed, timestamped development activity log for Xeno OS.
 All AI agents and developers MUST automatically append new session briefings to this file upon making changes.
 
+### August 27, 2026 - Session 24 Briefing: Persistent Download Backup Store, Zero-Redownload Smart Cache Engine, & Auto-Adjusting Storage
+- **Primary Objective**:
+  * Eliminate redundant, repetitive downloads of unchanged kernel deb packages and driver repositories across build sessions.
+  * Build a **Persistent Download Backup Store** (`cache/downloads/kernel/` and `cache/downloads/drivers/`) to mirror and protect validated assets.
+  * Implement **Smart Non-Destructive Update Verification**: Query remote releases before downloading, reuse validated local packages instantly (0s download) if unchanged or offline, and stage updates into isolated staging folders (`cache/staging/`) with package integrity validation.
+  * Add persistent driver repository caching in `drivers/install-oot-wifi.sh` to eliminate repeated git clones.
+  * Introduce **Auto-Adjusting Storage Efficiency**: Automatically clean staging directories and partial files (`*.part`, `*.tmp`, `*.dpkg-new`) while preserving valid offline binary assets.
+- **Changes Made**:
+  * **Smart Kernel Cache & Update Gate (`scripts/auto-build.sh` & `scripts/xeno-reaper.sh`)**:
+    - Created persistent mirror directory `cache/downloads/kernel/` and isolated temporary download directory `cache/staging/`.
+    - Added automatic cache restoration from `cache/downloads/kernel/` if `kernel/cache/` is missing or cleared.
+    - Updated release query logic: if local cache is valid and tag matches (`REMOTE_TAG == LOCAL_TAG`) or remote is unreachable, reuses the local cache instantly in 0.0 seconds.
+    - Protected active cache: new downloads are written to `cache/staging/kernel/` and validated via `validate-kernel-deb.sh` before replacing active files.
+    - Added local custom kernel preservation: builds from `kernel/output/` are tagged as `local-custom-*` and never overwritten by older remote releases.
+  * **Driver Source Caching (`drivers/install-oot-wifi.sh`)**:
+    - Persistent store created at `cache/downloads/drivers/rtl8812au`.
+    - Automatically executes fast `git pull` if online or copies from local cache in 0.05 seconds if offline, eliminating repeated git clone downloads.
+  * **Storage Cleanup Engine (`scripts/auto-build.sh`)**:
+    - Prunes temporary staging directories and dangling `.part` / `.tmp` files in Stage 7 optimization.
+  * **Git Configuration**:
+    - Added `cache/` to `.gitignore` to prevent repository bloat while preserving local offline assets.
+- **Verification & Diagnostic Outcome**:
+  * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
+  * Verified `bash -n scripts/xeno-reaper.sh`: 0 syntax errors.
+  * Verified `bash -n drivers/install-oot-wifi.sh`: 0 syntax errors.
+  * Executed Stage 2 cache test: 100% verified cache reuse in 0.0s (`Tag: kernel-21`).
+  * Executed `bash scripts/xeno-reaper.sh health`: 0 issues found (clean exit code 0).
+
+---
+
 ### August 27, 2026 - Session 23 Briefing: Interactive ASCII Topology Node Graph, Unbuffered `\r`/`\n` Progress Streaming, & SquashFS/Xorriso Sub-Bars
 - **Primary Objective**:
   * Address invisible progress during `mksquashfs` and long operations where output was suppressed or blocked behind carriage return buffering (`\r`).

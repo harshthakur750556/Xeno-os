@@ -706,60 +706,128 @@ render_telemetry_dashboard
 render_stage_progress 1
 run_with_spinner "Applying boot display & PAM security limits" 6 bash "$WS_DIR/scripts/xeno-reaper.sh" fix-boot
 
-# ── STAGE 2: GitHub auth & Kernel release fetch ──────────────
+# ── STAGE 2: Smart Kernel & Download Cache Synchronization ──
 render_stage_progress 2
 ACTUAL_USER="${SUDO_USER:-xeno}"
-if ! sudo -u "$ACTUAL_USER" gh auth status &>/dev/null && ! gh auth status &>/dev/null; then
-    echo -e "${C_RED}ERROR: GitHub CLI is not authenticated. Run 'gh auth login' first.${C_RESET}"
-    exit 1
-fi
 
-DETECTED_REPO=$(git config --get remote.origin.url 2>/dev/null | sed -E 's#.*github.com[:/](.+)(\.git)?$#\1#' | sed 's/\.git$//' || echo "")
-REPO="${DETECTED_REPO:-YOURGITHUBUSERNAME/xeno-os}"
+BACKUP_CACHE_DIR="$WS_DIR/cache/downloads"
+BACKUP_KERNEL_DIR="$BACKUP_CACHE_DIR/kernel"
+BACKUP_DRIVERS_DIR="$BACKUP_CACHE_DIR/drivers"
+STAGING_DIR="$WS_DIR/cache/staging"
+BACKUP_META_FILE="$BACKUP_KERNEL_DIR/latest_release.json"
+
+mkdir -p "$CACHE_DIR" "$BACKUP_KERNEL_DIR" "$BACKUP_DRIVERS_DIR" "$STAGING_DIR" "$WS_DIR/iso/output"
+chown -R "$ACTUAL_USER:$ACTUAL_USER" "$WS_DIR/cache" "$CACHE_DIR" 2>/dev/null || true
+
+DETECTED_REPO=$(git config --get remote.origin.url 2>/dev/null | sed -E 's#^.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$#\1#' | sed 's/\.git$//' || echo "")
+REPO="${DETECTED_REPO:-harshthakur750556/Xeno-os}"
 echo -e "  ${C_CYAN}Targeting Repository:${C_RESET} ${REPO}"
 
-mkdir -p "$CACHE_DIR" "$WS_DIR/iso/output"
-chown -R "$ACTUAL_USER:$ACTUAL_USER" "$CACHE_DIR" 2>/dev/null || true
+# 2.1 Stage locally compiled kernel if present in kernel/output
+if ls "$WS_DIR/kernel/output"/linux-image-*.deb &>/dev/null; then
+    run_with_spinner "Staging fresh local kernel from kernel/output" 4 bash "$WS_DIR/scripts/xeno-reaper.sh" stage-kernel || true
+    cp "$CACHE_DIR"/*.deb "$BACKUP_KERNEL_DIR/" 2>/dev/null || true
+    cp "$META_FILE" "$BACKUP_KERNEL_DIR/" 2>/dev/null || true
+fi
+
+# 2.2 Restore from backup store if cache/ is empty
+if ! ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && ls "$BACKUP_KERNEL_DIR"/linux-image-*.deb &>/dev/null; then
+    echo -e "  ${C_BLUE}ℹ [CACHE RESTORE]${C_RESET} Restoring kernel packages from persistent backup folder..."
+    cp "$BACKUP_KERNEL_DIR"/*.deb "$CACHE_DIR/" 2>/dev/null || true
+    [ -f "$BACKUP_KERNEL_DIR/latest_release.json" ] && cp "$BACKUP_KERNEL_DIR/latest_release.json" "$META_FILE" 2>/dev/null || true
+fi
+
+# 2.3 Verify local cache integrity
+LOCAL_KERNEL_VALID=0
+if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null; then
+    if bash "$WS_DIR/kernel/validate-kernel-deb.sh" "$CACHE_DIR" >/dev/null 2>&1; then
+        LOCAL_KERNEL_VALID=1
+        cp "$CACHE_DIR"/*.deb "$BACKUP_KERNEL_DIR/" 2>/dev/null || true
+        [ -f "$META_FILE" ] && cp "$META_FILE" "$BACKUP_KERNEL_DIR/" 2>/dev/null || true
+    fi
+fi
+
+LOCAL_TAG=$(jq -r '.tagName // empty' "$META_FILE" 2>/dev/null || echo "unknown")
+[ -z "$LOCAL_TAG" ] && LOCAL_TAG="unknown"
 
 NEED_DOWNLOAD=false
 REMOTE_TAG=""
+RELEASE_INFO=""
 
-if ls "$WS_DIR/kernel/output"/linux-image-*.deb &>/dev/null; then
-    run_with_spinner "Staging fresh local kernel from kernel/output" 4 bash "$WS_DIR/scripts/xeno-reaper.sh" stage-kernel || true
+# 2.4 Query remote release without destroying working local cache
+GH_ONLINE=0
+if sudo -u "$ACTUAL_USER" gh auth status &>/dev/null || gh auth status &>/dev/null; then
+    RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
+    if [ -n "$RELEASE_INFO" ]; then
+        REMOTE_TAG=$(echo "$RELEASE_INFO" | jq -r '.tagName // empty')
+        [ -n "$REMOTE_TAG" ] && GH_ONLINE=1
+    fi
 fi
 
-RELEASE_INFO=$(sudo -u "$ACTUAL_USER" gh release view -R "$REPO" --json tagName,publishedAt 2>/dev/null || true)
-if [ -n "$RELEASE_INFO" ]; then
-    REMOTE_TAG=$(echo "$RELEASE_INFO" | jq -r '.tagName // empty')
-fi
-
-if ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null && [ -f "$META_FILE" ]; then
-    LOCAL_TAG=$(jq -r '.tagName // empty' "$META_FILE" 2>/dev/null || true)
-    if [ -n "$REMOTE_TAG" ] && [ "$REMOTE_TAG" != "$LOCAL_TAG" ] && [[ "$LOCAL_TAG" != local-build-* ]]; then
-        echo -e "  ${C_YELLOW}⚠ [ROLLOUT DETECTED]${C_RESET} Remote ($REMOTE_TAG) != local ($LOCAL_TAG). Updating..."
-        NEED_DOWNLOAD=true
+if [ "$LOCAL_KERNEL_VALID" -eq 1 ]; then
+    if [ "$GH_ONLINE" -eq 1 ]; then
+        if [[ "$LOCAL_TAG" == local-build-* ]] || [[ "$LOCAL_TAG" == local-custom-* ]]; then
+            echo -e "  ${C_GREEN}✔ [LOCAL CUSTOM KERNEL]${C_RESET} Preserving fresh locally built XanMod kernel ($LOCAL_TAG, 0s download)"
+            NEED_DOWNLOAD=false
+        elif [ "$REMOTE_TAG" = "$LOCAL_TAG" ]; then
+            echo -e "  ${C_GREEN}✔ [KERNEL CACHE VERIFIED]${C_RESET} Local kernel is up-to-date (Tag: $LOCAL_TAG, 0s download)"
+            NEED_DOWNLOAD=false
+        else
+            echo -e "  ${C_YELLOW}⚠ [NEW RELEASE DETECTED]${C_RESET} Remote update available ($REMOTE_TAG != local $LOCAL_TAG). Staging update..."
+            NEED_DOWNLOAD=true
+        fi
     else
-        echo -e "  ${C_GREEN}✔ [KERNEL CACHE]${C_RESET} Local backup tag=$LOCAL_TAG remote=$REMOTE_TAG"
+        echo -e "  ${C_GREEN}✔ [KERNEL CACHE REUSED]${C_RESET} Using verified offline/local kernel cache ($LOCAL_TAG, 0s download)"
+        NEED_DOWNLOAD=false
     fi
 else
-    echo -e "  ${C_BLUE}ℹ [INITIAL DOWNLOAD]${C_RESET} Fetching latest kernel release..."
+    echo -e "  ${C_BLUE}ℹ [INITIAL DOWNLOAD]${C_RESET} Local kernel cache missing or invalid. Downloading latest release..."
     NEED_DOWNLOAD=true
 fi
 
+# 2.5 Safe Isolated Staging Download (never destroy working cache on download failure)
 if [ "$NEED_DOWNLOAD" = true ]; then
-    rm -f "$CACHE_DIR"/*.deb
-    download_kernel_pkgs() {
-        if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$CACHE_DIR" --clobber 2>/dev/null; then
-            [ -n "$RELEASE_INFO" ] && echo "$RELEASE_INFO" > "$META_FILE"
-            return 0
+    if [ "$GH_ONLINE" -ne 1 ]; then
+        if [ "$LOCAL_KERNEL_VALID" -eq 1 ]; then
+            echo -e "  ${C_YELLOW}⚠ [WARN] Cannot check remote release (GH offline/unauthenticated). Reusing local validated cache.${C_RESET}"
+        else
+            echo -e "${C_RED}ERROR: GitHub CLI is not authenticated and no valid local kernel cache exists. Run 'gh auth login'.${C_RESET}"
+            exit 1
         fi
-        return 1
-    }
-    export -f download_kernel_pkgs
-    run_with_spinner "Downloading kernel packages from GitHub Release" 8 download_kernel_pkgs || {
-        echo -e "  ${C_YELLOW}⚠ [WARN] Failed downloading release debs. Using local cache if present.${C_RESET}"
-    }
+    else
+        download_kernel_pkgs() {
+            rm -rf "$STAGING_DIR/kernel"
+            mkdir -p "$STAGING_DIR/kernel"
+            if sudo -u "$ACTUAL_USER" gh release download -R "$REPO" --pattern "*.deb" -D "$STAGING_DIR/kernel" --clobber 2>/dev/null; then
+                if bash "$WS_DIR/kernel/validate-kernel-deb.sh" "$STAGING_DIR/kernel" >/dev/null 2>&1; then
+                    rm -f "$CACHE_DIR"/*.deb
+                    cp "$STAGING_DIR/kernel"/*.deb "$CACHE_DIR/"
+                    cp "$STAGING_DIR/kernel"/*.deb "$BACKUP_KERNEL_DIR/"
+                    [ -n "$RELEASE_INFO" ] && echo "$RELEASE_INFO" > "$META_FILE"
+                    [ -n "$RELEASE_INFO" ] && echo "$RELEASE_INFO" > "$BACKUP_META_FILE"
+                    rm -rf "$STAGING_DIR/kernel"
+                    return 0
+                else
+                    echo -e "  ${C_YELLOW}⚠ Downloaded packages failed validation checks.${C_RESET}"
+                    rm -rf "$STAGING_DIR/kernel"
+                    return 1
+                fi
+            fi
+            return 1
+        }
+        export -f download_kernel_pkgs
+        run_with_spinner "Downloading & staging validated kernel packages from GitHub" 8 download_kernel_pkgs || {
+            if [ "$LOCAL_KERNEL_VALID" -eq 1 ]; then
+                echo -e "  ${C_YELLOW}⚠ [FALLBACK] Update download failed. Safely continuing with verified local cache.${C_RESET}"
+            else
+                echo -e "${C_RED}ERROR: Failed downloading kernel packages and no valid cache exists.${C_RESET}"
+                exit 1
+            fi
+        }
+    fi
 fi
+
+rm -rf "$STAGING_DIR" 2>/dev/null || true
 
 if ! ls "$CACHE_DIR"/linux-image-*.deb &>/dev/null; then
     echo -e "${C_RED}ERROR: No linux-image-*.deb found in cache ($CACHE_DIR).${C_RESET}"
@@ -946,6 +1014,10 @@ optimize_rootfs_caches() {
     rm -rf "$ROOTFS/var/lib/flatpak/runtime"/*/*.Locale 2>/dev/null || true
     find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find "$ROOTFS/usr" "$ROOTFS/home" "$ROOTFS/var" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+
+    # Clean temporary staging directory & partial downloads
+    rm -rf "$WS_DIR/cache/staging" 2>/dev/null || true
+    find "$WS_DIR/cache" "$WS_DIR/kernel/cache" -maxdepth 2 -type f \( -name "*.part" -o -name "*.tmp" -o -name "*.dpkg-new" \) -delete 2>/dev/null || true
 
     mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/tmp" "$ROOTFS/run"
     touch "$ROOTFS/proc/.keep" "$ROOTFS/sys/.keep" "$ROOTFS/dev/.keep" "$ROOTFS/tmp/.keep" "$ROOTFS/run/.keep"
