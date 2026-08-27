@@ -9,6 +9,28 @@
 This file contains the complete, detailed, timestamped development activity log for Xeno OS.
 All AI agents and developers MUST automatically append new session briefings to this file upon making changes.
 
+### August 27, 2026 - Session 23 Briefing: Interactive ASCII Topology Node Graph, Unbuffered `\r`/`\n` Progress Streaming, & SquashFS/Xorriso Sub-Bars
+- **Primary Objective**:
+  * Address invisible progress during `mksquashfs` and long operations where output was suppressed or blocked behind carriage return buffering (`\r`).
+  * Implement an **Interactive ASCII Pipeline Topology & Execution Node Graph** for real-time visual progress across all 9 build stages (`[✔ S1] ──▶ [▶ S7:SQUASH] ──▶ [░ S8]`).
+  * Render **Dynamic Real-Time Sub-Gauges** for SquashFS compression (`[███████░░░░░░░] 51% (24,500/48,000 files compressed)`) and Xorriso mastering with immediate unbuffered line flushing.
+- **Changes Made**:
+  * **Interactive ASCII Pipeline Topology Graph (`scripts/auto-build.sh`)**:
+    - Added `render_node_graph()` to `render_stage_progress()`.
+    - Visually displays all 9 stages in a two-tier flowchart box: completed stages render in vibrant green (`[✔ S1:ENV]`), the currently executing stage glows in bold yellow (`[▶ S7:SQUASH]`), and upcoming stages remain dimmed (`[░ S8:BOOT]`).
+  * **Unbuffered Real-Time `\r`/`\n` Stream Engine (`scripts/auto-build.sh`)**:
+    - Replaced `sys.stdin.readline` (which blocked on carriage returns) with an unbuffered continuous byte/chunk stream processor that splits on both `\r` and `\n`.
+    - Added regex pattern matching for `mksquashfs` (`(\d+)/(\d+)\s+(\d+)%`) and `xorriso` (`UPDATE : (\d+) of (\d+) blocks`), dynamically translating raw progress output into colored Cyber-Nord sub-bars.
+    - Guaranteed instant output flushing (`sys.stdout.flush()`), ensuring zero messages are hidden or delayed.
+  * **SquashFS Progress Flag**:
+    - Added `-progress` flag to `mksquashfs` in `build_squashfs_image`, forcing it to emit live file-count and percentage updates when running in background pipes.
+- **Verification & Diagnostic Outcome**:
+  * Verified `bash -n scripts/auto-build.sh`: 0 syntax errors.
+  * Tested live streaming with simulated `mksquashfs` and `xorriso` inputs: 100% real-time rendering.
+  * Executed `bash scripts/xeno-reaper.sh health`: 0 issues found (clean exit code 0).
+
+---
+
 ### August 23, 2026 - Session 22 Briefing: Edition & Release Matrix Selector, Beta v10 Final Milestone Cap, & Snapshot Freeze
 - **Primary Objective**:
   * Implement an interactive and CLI-driven **Designer Edition & Release Target Matrix Selector** with Cyber-Nord ASCII banners, glowing border boxes, stability gauges, and non-hardcoded sub-headers.

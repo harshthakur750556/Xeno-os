@@ -474,6 +474,42 @@ render_telemetry_dashboard() {
     echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}\n"
 }
 
+# Dynamic Pipeline Topology Node Graph
+render_node_graph() {
+    local cur_stage="$1"
+    local fmt_node
+    fmt_node() {
+        local num="$1" name="$2"
+        if [ "$num" -lt "$cur_stage" ]; then
+            printf "${C_GREEN}[✔ %s]${C_RESET}" "$name"
+        elif [ "$num" -eq "$cur_stage" ]; then
+            printf "${C_BOLD}${C_YELLOW}[▶ %s]${C_RESET}" "$name"
+        else
+            printf "${C_DIM}[░ %s]${C_RESET}" "$name"
+        fi
+    }
+    local arrow="${C_CYAN}──▶${C_RESET}"
+    local n1 n2 n3 n4 n5 n6 n7 n8 n9
+    n1=$(fmt_node 1 "S1:ENV")
+    n2=$(fmt_node 2 "S2:ROOTFS")
+    n3=$(fmt_node 3 "S3:REPOS")
+    n4=$(fmt_node 4 "S4:KERNEL")
+    n5=$(fmt_node 5 "S5:STACKS")
+    n6=$(fmt_node 6 "S6:CASPER")
+    n7=$(fmt_node 7 "S7:SQUASH")
+    n8=$(fmt_node 8 "S8:BOOT")
+    n9=$(fmt_node 9 "S9:ISO")
+
+    echo -e "${C_DIM}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "${C_DIM}│${C_RESET} ${C_BOLD}${C_CYAN}PIPELINE TOPOLOGY & REAL-TIME ACTIVE EXECUTION NODES${C_RESET}                       ${C_DIM}│${C_RESET}"
+    echo -e "${C_DIM}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    echo -e "  ${n1} ${arrow} ${n2} ${arrow} ${n3} ${arrow} ${n4}"
+    echo -e "       ${C_CYAN}│${C_RESET}"
+    echo -e "       ${C_CYAN}▼${C_RESET}"
+    echo -e "  ${n5} ${arrow} ${n6} ${arrow} ${n7} ${arrow} ${n8} ${arrow} ${n9}"
+    echo -e "${C_DIM}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
+}
+
 # Dynamic Master Progress Bar & Stage Header
 render_stage_progress() {
     local stage="$1"
@@ -502,7 +538,8 @@ render_stage_progress() {
     echo -e "${C_BOLD}${C_CYAN}═══════════════════════════════════════════════════════════════════════════════${C_RESET}"
     if [ "$IS_TTY" -eq 1 ]; then
         printf "  ${C_BOLD}Master Progress:${C_RESET} %b  ${C_DIM}│ Elapsed: [%02d:%02d] │ Est. Remaining: [%02d:%02d]${C_RESET}\n" "$bar" "$total_mins" "$total_secs" "$rem_mins" "$rem_secs"
-        echo -e "  ${C_DIM}Stage Target Time: ~${STAGE_EST_SECS[$stage]}s | Total Pipeline Target: ~${TOTAL_ESTIMATED_SECS}s (~$(( TOTAL_ESTIMATED_SECS / 60 ))m $(( TOTAL_ESTIMATED_SECS % 60 ))s)${C_RESET}\n"
+        echo -e "  ${C_DIM}Stage Target Time: ~${STAGE_EST_SECS[$stage]}s | Total Pipeline Target: ~${TOTAL_ESTIMATED_SECS}s (~$(( TOTAL_ESTIMATED_SECS / 60 ))m $(( TOTAL_ESTIMATED_SECS % 60 ))s)${C_RESET}"
+        render_node_graph "$stage"
     fi
 }
 
@@ -533,7 +570,7 @@ run_with_spinner() {
     # Execute directly in bash environment, piping stdout/stderr into Python unbuffered real-time sync streamer
     local rc=0
     "$@" 2>&1 | python3 -u -c '
-import sys, time
+import sys, time, re
 
 stage_num = int(sys.argv[1])
 stage_est = int(sys.argv[2])
@@ -547,23 +584,68 @@ C_RESET = "\033[0m"
 C_CYAN = "\033[38;2;136;192;208m"
 C_BLUE = "\033[38;2;129;161;193m"
 C_GREEN = "\033[38;2;163;190;140m"
+C_YELLOW = "\033[38;2;235;203;139m"
+C_MAGENTA = "\033[38;2;180;142;173m"
 C_DIM = "\033[2m"
 C_BOLD = "\033[1m"
 
-for line in iter(sys.stdin.readline, ""):
-    now = time.time()
-    t_elapsed = int(now - build_start)
-    s_elapsed = int(now - stage_start)
+def render_bar(val, max_val=100, width=14, color=C_GREEN):
+    val = max(0, min(max_val, val))
+    filled = int(val * width / max_val) if max_val > 0 else 0
+    empty = max(0, width - filled)
+    return f"{color}{chr(9608)*filled}{C_DIM}{chr(9617)*empty}{C_RESET} {val:3d}%"
+
+buf = ""
+while True:
+    try:
+        chunk = sys.stdin.read(1)
+    except Exception:
+        break
+    if not chunk:
+        if buf.strip():
+            raw = buf.strip()
+            now = time.time()
+            t_elapsed = int(now - build_start)
+            t_min, t_sec = divmod(t_elapsed, 60)
+            master_pct = min(99, int(((stage_base_secs + min(int(now - stage_start), stage_est)) / total_est) * 100)) if total_est > 0 else 0
+            prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{master_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
+            print(prefix + raw)
+            sys.stdout.flush()
+        break
     
-    sim_secs = stage_base_secs + min(s_elapsed, stage_est)
-    master_pct = min(99, int((sim_secs / total_est) * 100)) if total_est > 0 else 0
-    t_min, t_sec = divmod(t_elapsed, 60)
-    
-    clean_line = line.split("\r")[-1].rstrip("\n")
-    if clean_line:
-        prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{master_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
-        print(prefix + clean_line)
+    if chunk in ("\r", "\n"):
+        raw = buf.strip()
+        buf = ""
+        if not raw:
+            continue
+        
+        now = time.time()
+        t_elapsed = int(now - build_start)
+        s_elapsed = int(now - stage_start)
+        t_min, t_sec = divmod(t_elapsed, 60)
+        
+        sq_match = re.search(r"(\d+)/(\d+)\s+(\d+)%", raw)
+        xo_match = re.search(r"UPDATE\s*:\s*(\d+)\s+of\s+(\d+)\s+blocks.*?\((\d+)%\)", raw)
+        
+        if sq_match:
+            cur_f, tot_f, sq_pct = int(sq_match.group(1)), int(sq_match.group(2)), int(sq_match.group(3))
+            sub_bar = render_bar(sq_pct, 100, 14, C_GREEN)
+            prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{sq_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
+            msg = f"{C_BOLD}{C_GREEN}⟪SQUASHFS ZSTD L19⟫{C_RESET} {sub_bar} {C_DIM}({cur_f:,}/{tot_f:,} files compressed){C_RESET}"
+            print(prefix + msg)
+        elif xo_match:
+            cur_b, tot_b, xo_pct = int(xo_match.group(1)), int(xo_match.group(2)), int(xo_match.group(3))
+            sub_bar = render_bar(xo_pct, 100, 14, C_MAGENTA)
+            prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{xo_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
+            msg = f"{C_BOLD}{C_MAGENTA}⟪XORRISO ISO MASTER⟫{C_RESET} {sub_bar} {C_DIM}({cur_b:,}/{tot_b:,} blocks written){C_RESET}"
+            print(prefix + msg)
+        else:
+            master_pct = min(99, int(((stage_base_secs + min(s_elapsed, stage_est)) / total_est) * 100)) if total_est > 0 else 0
+            prefix = f"  {C_DIM}[{C_CYAN}{t_min:02d}:{t_sec:02d}{C_DIM} │ {C_BOLD}{master_pct:2d}%{C_DIM} │ {C_BLUE}S{stage_num}{C_DIM}]{C_RESET} "
+            print(prefix + raw)
         sys.stdout.flush()
+    else:
+        buf += chunk
 ' "$stage_num" "$stage_est" "$stage_base_secs" "$build_start" "$total_est" || rc=${PIPESTATUS[0]}
 
     local end_time
@@ -873,7 +955,7 @@ run_with_spinner "Purging temporary build caches, bytecode, and CUDA runtimes" 1
 
 build_squashfs_image() {
     mksquashfs "$ROOTFS" "$WS_DIR/iso/build/casper/filesystem.squashfs" \
-        -comp zstd -Xcompression-level 19 -b 1M -noappend \
+        -comp zstd -Xcompression-level 19 -b 1M -noappend -progress \
         -wildcards \
         -e "proc/*" "sys/*" "dev/*" "tmp/*" "run/*" \
         -e "var/cache/apt/archives/*" "var/lib/apt/lists/*" "var/cache/*" \
